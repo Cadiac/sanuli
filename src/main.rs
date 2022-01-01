@@ -2,9 +2,10 @@ extern crate serde_scan;
 
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use yew::{
-    classes, function_component, html, Callback, Children,
-    Component, Context, Html, MouseEvent, Properties,
+    classes, function_component, html, Callback, Children, Component, Context, Html, MouseEvent,
+    Properties,
 };
 
 const WORDS: &str = include_str!("../vendor/kotus-sanalista_v1/kotus-sanalista_v1.xml");
@@ -18,7 +19,7 @@ fn parse_words(input: &str) -> Vec<Vec<char>> {
     for line in words[0].lines() {
         let (word, _): (String, String) = serde_scan::scan!("<st><s>{}</s>{}" <- line).unwrap();
 
-        if word.len() == 5 {
+        if word.chars().count() == 5 {
             word_list.push(word.to_uppercase().chars().collect());
         }
     }
@@ -29,7 +30,7 @@ fn parse_words(input: &str) -> Vec<Vec<char>> {
 enum Msg {
     KeyPress(char),
     Backspace,
-    Submit,
+    Guess,
 }
 
 struct Model {
@@ -37,7 +38,9 @@ struct Model {
     word: Vec<char>,
     is_guessing: bool,
     is_winner: bool,
-    characters: HashMap<char, CharacterState>,
+    present_characters: HashSet<char>,
+    correct_characters: HashSet<(char, usize)>,
+    absent_characters: HashSet<char>,
     guesses: [Vec<char>; 6],
     current_guess: usize,
 }
@@ -48,6 +51,32 @@ pub enum CharacterState {
     NotInWord,
     InWord,
     InCorrectPosition,
+}
+
+impl Model {
+    fn map_character_state(&self, character: char, index: usize) -> Option<&'static str> {
+        if self.correct_characters.contains(&(character, index)) {
+            Some("correct")
+        } else if self.absent_characters.contains(&character) {
+            Some("absent")
+        } else if self.present_characters.contains(&character) {
+            Some("present")
+        } else {
+            None
+        }
+    }
+
+    fn map_keyboard_state(&self, character: char) -> Option<&'static str> {
+        if self.correct_characters.iter().any(|(c, _)| *c == character) {
+            Some("correct")
+        } else if self.absent_characters.contains(&character) {
+            Some("absent")
+        } else if self.present_characters.contains(&character) {
+            Some("present")
+        } else {
+            None
+        }
+    }
 }
 
 impl Component for Model {
@@ -64,7 +93,9 @@ impl Component for Model {
             word_list,
             is_guessing: true,
             is_winner: false,
-            characters: HashMap::new(),
+            present_characters: HashSet::new(),
+            correct_characters: HashSet::new(),
+            absent_characters: HashSet::new(),
             guesses: [
                 Vec::with_capacity(5),
                 Vec::with_capacity(5),
@@ -97,7 +128,7 @@ impl Component for Model {
 
                 true
             }
-            Msg::Submit => {
+            Msg::Guess => {
                 if self.guesses[self.current_guess].len() != 5 {
                     return false;
                 }
@@ -109,28 +140,14 @@ impl Component for Model {
                 self.is_winner = self.guesses[self.current_guess] == self.word;
 
                 for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
-                    let current_state = self
-                        .characters
-                        .entry(*character)
-                        .or_insert(CharacterState::Unknown);
-
-                    if *current_state == CharacterState::InCorrectPosition {
-                        continue;
-                    }
-
                     if self.word[index] == *character {
-                        *current_state = CharacterState::InCorrectPosition;
-                        continue;
-                    }
-
-                    if *current_state == CharacterState::InWord {
-                        continue;
+                        self.correct_characters.insert((*character, index));
                     }
 
                     if self.word.contains(character) {
-                        *current_state = CharacterState::InWord;
+                        self.present_characters.insert(*character);
                     } else {
-                        *current_state = CharacterState::NotInWord;
+                        self.absent_characters.insert(*character);
                     }
                 }
 
@@ -160,17 +177,16 @@ impl Component for Model {
                 <header>
                     <div class="title">{ "Sanuli" }</div>
                     <div class="subtitle">{ "Voititko? "}{ self.is_winner }</div>
-                    <div class="subtitle">{ "Sana: "}{ self.word.iter().collect::<String>() }</div>
+                    // <div class="subtitle">{ "Sana: "}{ self.word.iter().collect::<String>() }</div>
                 </header>
 
                 <div class="board-container">
                     <div class="board">
                         { self.guesses.iter().map(|guess| html! {
                             <div class="row">
-                                { (0..5).map(|i| html! {
-                                    <div class={classes!("tile",
-                                        guess.get(i).and_then(|c| self.characters.get(c).and_then(map_character_state)))}>
-                                        { guess.get(i).unwrap_or(&' ') }
+                                { (0..5).map(|index| html! {
+                                    <div class={classes!("tile", guess.get(index).and_then(|c| self.map_character_state(*c, index)))}>
+                                        { guess.get(index).unwrap_or(&' ') }
                                     </div>
                                 }).collect::<Html>() }
                             </div>
@@ -182,9 +198,7 @@ impl Component for Model {
                     <div>
                         {
                             keyboard[0].iter().cloned().map(|key| html! {
-                                <button class={classes!(
-                                    "keyboard-button",
-                                    self.characters.get(&key).and_then(map_character_state))}
+                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                     onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
                             }).collect::<Html>()
                         }
@@ -192,9 +206,7 @@ impl Component for Model {
                     <div>
                         {
                             keyboard[1].iter().cloned().map(|key| html! {
-                                <button class={classes!(
-                                    "keyboard-button",
-                                    self.characters.get(&key).and_then(map_character_state))}
+                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                     onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
                             }).collect::<Html>()
                         }
@@ -202,28 +214,17 @@ impl Component for Model {
                     <div>
                         {
                             keyboard[2].iter().cloned().map(|key| html! {
-                                <button class={classes!(
-                                    "keyboard-button",
-                                    self.characters.get(&key).and_then(map_character_state))}
+                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                     onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
                             }).collect::<Html>()
                         }
                         <button class={classes!("keyboard-button")}
                             onclick={link.callback(move |_| Msg::Backspace)}>{ "<x]" }</button>
-                        <button onclick={link.callback(|_| Msg::Submit)}>{ "ARVAA" }</button>
+                        <button onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button>
                     </div>
                 </div>
             </div>
         }
-    }
-}
-
-fn map_character_state(state: &CharacterState) -> Option<&'static str> {
-    match state {
-        CharacterState::InWord => Some("in-word"),
-        CharacterState::NotInWord => Some("not-in-word"),
-        CharacterState::InCorrectPosition => Some("in-correct-position"),
-        CharacterState::Unknown => None,
     }
 }
 

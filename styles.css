@@ -72,14 +72,14 @@ header {
     user-select: none;
 }
 
-.in-word {
+.present {
     background-color: #b59f3b;
 }
 
-.not-in-word {
+.absent {
     background-color: #3a3a3c;
 }
 
-.in-correct-position {
+.correct {
     background-color: #538d4e;
 }
