@@ -33,7 +33,7 @@ body {
     margin-top: 10px;
     margin-bottom: 10px;
     font-weight: 700;
-    font-size: 24px;
+    font-size: 20px;
     letter-spacing: 0.2rem;
     text-transform: uppercase;
     text-align: center;
@@ -43,6 +43,7 @@ body {
     width: 100%;
     margin: 0 auto;
     height: 100%;
+    max-width: 500px;
     display: flex;
     flex-direction: column;
 }
@@ -71,6 +72,8 @@ body {
     justify-content: flex-end;
     align-items: center;
     overflow: hidden;
+    margin-left: 12px;
+    margin-right: 6px;
     margin-bottom: 6px;
 }
 
@@ -78,31 +81,36 @@ body {
     display: flex;
     width: 100%;
     justify-content: center;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
 }
 
 .keyboard-second {
-    margin-left: 24px;
+    padding-left: 24px;
+}
+
+.spacer {
+    flex: 0.4;
 }
 
 .keyboard-button {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex: 1;
+    height: 50px;
 
     background-color: var(--unknown);
     border: none;
     border-radius: 6px;
     color: white;
 
+    touch-action: manipulation;
     cursor: pointer;
     user-select: none;
 
-    height: 3em;
-    font-size: 1.5em;
     font-weight: bold;
-    padding: 0.5em 1em;
-    margin-right: 12px;
+    padding: 0.5em 0.5em;
+    margin-right: 6px;
 
     text-transform: uppercase;
 }

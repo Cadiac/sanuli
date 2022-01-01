@@ -263,8 +263,10 @@ impl Component for Model {
                                     onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
                             }).collect::<Html>()
                         }
+                        <div class="spacer" />
                     </div>
-                    <div class="keyboard-row keyboard-second">
+                    <div class="keyboard-row">
+                        <div class="spacer" />
                         {
                             keyboard[1].iter().cloned().map(|key| html! {
                                 <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
@@ -273,6 +275,8 @@ impl Component for Model {
                         }
                     </div>
                     <div class="keyboard-row">
+                        <div class="spacer" />
+                        <div class="spacer" />
                         {
                             keyboard[2].iter().cloned().map(|key| html! {
                                 <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
@@ -280,8 +284,10 @@ impl Component for Model {
                             }).collect::<Html>()
                         }
                         <button class={classes!("keyboard-button")}
-                            onclick={link.callback(move |_| Msg::Backspace)}>{ "<x]" }</button>
+                            onclick={link.callback(move |_| Msg::Backspace)}>{ "⌫" }</button>
                         <button class={classes!("keyboard-button")} onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button>
+                        <div class="spacer" />
+                        <div class="spacer" />
                     </div>
                 </div>
             </div>
