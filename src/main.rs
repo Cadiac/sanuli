@@ -125,8 +125,7 @@ impl Component for Model {
     fn create(_ctx: &Context<Self>) -> Self {
         let word_list = parse_words(WORDS);
 
-        // let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
-        let word = "HAIKU".chars().collect();
+        let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
 
         Self {
             word,
