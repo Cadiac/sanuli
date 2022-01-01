@@ -2,6 +2,7 @@ use rand::seq::SliceRandom;
 use wasm_bindgen::{prelude::Closure, JsCast};
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
 
 const WORDS: &str = include_str!("../word-list.txt");
@@ -51,22 +52,57 @@ struct Model {
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum CharacterState {
     Unknown,
-    NotInWord,
-    InWord,
-    InCorrectPosition,
+    Absent,
+    Present,
+    Correct,
 }
 
 impl Model {
-    fn map_character_state(&self, character: char, index: usize) -> Option<&'static str> {
-        if self.correct_characters.contains(&(character, index)) {
-            Some("correct")
-        } else if self.absent_characters.contains(&character) {
-            Some("absent")
-        } else if self.present_characters.contains(&character) {
-            Some("present")
-        } else {
-            None
+    fn character_state_mappings(
+        &self,
+        guess: &Vec<char>,
+    ) -> [Option<&'static str>; 5] {
+        let mut mappings = [Some("absent"); 5];
+        let mut correct_counts: HashMap<char, i32> = HashMap::new();
+        let mut present_counts: HashMap<char, i32> = HashMap::new();
+
+        for (index, character) in guess.iter().enumerate() {
+            if self.correct_characters.contains(&(*character, index)) {
+                *correct_counts.entry(*character).or_insert(0) += 1;
+                mappings[index] = Some("correct");
+            }
         }
+
+        for (index, character) in guess.iter().enumerate() {
+            if self.correct_characters.contains(&(*character, index)) {
+                continue;
+            }
+            if self.present_characters.contains(character) {
+                
+                let present_count = present_counts.entry(*character).or_insert(0);
+                let correct_count = correct_counts.entry(*character).or_insert(0);
+    
+                *present_count += 1;
+    
+                let character_present_in_word = self.word.iter().filter(|c| *c == character).count() as i32;
+    
+                let is_found_all = *correct_count == character_present_in_word;
+    
+                if is_found_all {
+                    mappings[index] = Some("absent");
+                } else {
+                    if *present_count - *correct_count <= character_present_in_word {
+                        mappings[index] = Some("present");
+                    } else {
+                        mappings[index] = Some("absent");
+                    }
+                }
+            } else {
+                mappings[index] = Some("absent");
+            }
+        }
+
+        mappings
     }
 
     fn map_keyboard_state(&self, character: char) -> Option<&'static str> {
@@ -89,7 +125,8 @@ impl Component for Model {
     fn create(_ctx: &Context<Self>) -> Self {
         let word_list = parse_words(WORDS);
 
-        let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        // let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        let word = "HAIKU".chars().collect();
 
         Self {
             word,
@@ -233,23 +270,31 @@ impl Component for Model {
         html! {
             <div class="game">
                 <header>
-                    <div class="title">{ "Sanuli" }</div>
+                    <h1 class="title">{ "Sanuli" }</h1>
                 </header>
-
                 <div class="board-container">
                     <div class="board">
-                        { self.guesses.iter().enumerate().map(|(g_index, guess)| html! {
-                            <div class="row">
-                                { (0..5).map(|c_index| html! {
-                                    <div class={classes!(
-                                        "tile",
-                                        guess.get(c_index).and_then(|c| self.map_character_state(*c, c_index)),
-                                        if self.is_guessing && g_index == self.current_guess { Some("current") } else { None }
-                                    )}>
-                                        { guess.get(c_index).unwrap_or(&' ') }
-                                    </div>
-                                }).collect::<Html>() }
-                            </div>
+                        { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
+                            let mappings = self.character_state_mappings(guess);
+
+                            html! {
+                                <div class="row">
+                                    {                                        
+                                        (0..5).map(|char_index| html! {
+                                        <div class={classes!(
+                                            "tile",
+                                            if guess_index == self.current_guess {
+                                                guess.get(char_index).and_then(|c| self.map_keyboard_state(*c))
+                                            } else {
+                                                mappings[char_index]
+                                            },
+                                            if self.is_guessing && guess_index == self.current_guess { Some("current") } else { None }
+                                        )}>
+                                            { guess.get(char_index).unwrap_or(&' ') }
+                                        </div>
+                                    }).collect::<Html>() }
+                                </div>
+                            }
                         }).collect::<Html>() }
                     </div>
                 </div>
@@ -297,5 +342,4 @@ impl Component for Model {
 
 fn main() {
     yew::start_app::<Model>();
-    // let app = yew::start_app_as_body::<Model>();
 }
