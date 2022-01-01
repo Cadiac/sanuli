@@ -182,11 +182,15 @@ impl Component for Model {
 
                 <div class="board-container">
                     <div class="board">
-                        { self.guesses.iter().map(|guess| html! {
+                        { self.guesses.iter().enumerate().map(|(g_index, guess)| html! {
                             <div class="row">
-                                { (0..5).map(|index| html! {
-                                    <div class={classes!("tile", guess.get(index).and_then(|c| self.map_character_state(*c, index)))}>
-                                        { guess.get(index).unwrap_or(&' ') }
+                                { (0..5).map(|c_index| html! {
+                                    <div class={classes!(
+                                        "tile",
+                                        guess.get(c_index).and_then(|c| self.map_character_state(*c, c_index)),
+                                        if g_index == self.current_guess { Some("current") } else { None }
+                                    )}>
+                                        { guess.get(c_index).unwrap_or(&' ') }
                                     </div>
                                 }).collect::<Html>() }
                             </div>

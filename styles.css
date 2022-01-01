@@ -1,6 +1,9 @@
-body {
+:root {
+    --present: #c9b458;
+    --absent: #3e3e3e;
+    --correct: #6aaa64;
     font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
-    background-color: #121213;
+    background-color: #121212;
 }
 
 header {
@@ -66,20 +69,41 @@ header {
     font-weight: bold;
     vertical-align: middle;
     box-sizing: border-box;
-    background-color: grey;
+    background-color: #121213;
     color: white;
     text-transform: uppercase;
     user-select: none;
+    border: 2px solid #3a3a3c;
 }
 
 .present {
-    background-color: #b59f3b;
+    background-color: var(--present);
+    border: none;
 }
 
 .absent {
-    background-color: #3a3a3c;
+    background-color: var(--absent);
+    border: none;
 }
 
 .correct {
-    background-color: #538d4e;
+    background-color: var(--correct);
+    border: none;
+}
+
+.current {
+    background-color: #818384;
+    border: none;
+}
+
+.current.present {
+    border: 5px solid var(--present);
+}
+
+.current.absent {
+    border: 5px solid var(--absent);
+}
+
+.current.correct {
+    border: 5px solid var(--correct);
 }
