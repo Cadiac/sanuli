@@ -34,6 +34,6 @@ For development, start the web server with
 
 ```
 $ trunk serve
-````
+```
 
 This should run the UI at 0.0.0.0:8080 with hot reload on code changes.
