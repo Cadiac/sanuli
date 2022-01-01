@@ -2,16 +2,14 @@ use rand::seq::SliceRandom;
 use wasm_bindgen::{prelude::Closure, JsCast};
 
 use std::collections::HashSet;
-use yew::{
-    classes, function_component, html, Callback, Children, Component, Context, Html, KeyboardEvent,
-    MouseEvent, Properties,
-};
+use yew::{classes, html, Component, Context, Html, KeyboardEvent};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const ALLOWED_KEYS: [char; 29] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
     'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
 ];
+const EMPTY: char = '\u{00a0}';
 
 fn parse_words(words: &str) -> Vec<Vec<char>> {
     let mut word_list = Vec::new();
@@ -38,6 +36,7 @@ struct Model {
 
     is_guessing: bool,
     is_winner: bool,
+    message: String,
 
     present_characters: HashSet<char>,
     correct_characters: HashSet<(char, usize)>,
@@ -97,6 +96,7 @@ impl Component for Model {
             word_list,
             is_guessing: true,
             is_winner: false,
+            message: EMPTY.to_string(),
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
             absent_characters: HashSet::new(),
@@ -164,26 +164,30 @@ impl Component for Model {
                     return false;
                 }
 
+                self.message = EMPTY.to_string();
                 self.guesses[self.current_guess].push(c);
 
                 true
             }
             Msg::Backspace => {
-                if !self.is_guessing || self.guesses[self.current_guess].len() <= 0 {
+                if !self.is_guessing || self.guesses[self.current_guess].is_empty() {
                     return false;
                 }
 
+                self.message = EMPTY.to_string();
                 self.guesses[self.current_guess].pop();
 
                 true
             }
             Msg::Guess => {
                 if self.guesses[self.current_guess].len() != 5 {
-                    return false;
+                    self.message = String::from("Liian vähän kirjaimia!");
+                    return true;
                 }
 
                 if !self.word_list.contains(&self.guesses[self.current_guess]) {
-                    return false;
+                    self.message = String::from("Ei sanalistalla");
+                    return true;
                 }
 
                 self.is_winner = self.guesses[self.current_guess] == self.word;
@@ -200,9 +204,14 @@ impl Component for Model {
                     }
                 }
 
-                if self.current_guess == 5 || self.is_winner {
+                if self.is_winner {
                     self.is_guessing = false;
+                    self.message = String::from("Löysit sanan! 🥳");
+                } else if self.current_guess == 5 {
+                    self.is_guessing = false;
+                    self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
                 } else {
+                    self.message = EMPTY.to_string();
                     self.current_guess += 1;
                 }
 
@@ -213,7 +222,6 @@ impl Component for Model {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-        // This gives us a component's "`Scope`" which allows us to send messages, etc to the component.
         let link = ctx.link();
 
         let keyboard = vec![
@@ -226,8 +234,6 @@ impl Component for Model {
             <div class="game">
                 <header>
                     <div class="title">{ "Sanuli" }</div>
-                    <div class="subtitle">{ "Voititko? "}{ self.is_winner }</div>
-                    <div class="subtitle">{ "Sana: "}{ self.word.iter().collect::<String>() }</div>
                 </header>
 
                 <div class="board-container">
@@ -249,7 +255,8 @@ impl Component for Model {
                 </div>
 
                 <div class="keyboard">
-                    <div>
+                    <div class="message">{ &self.message }</div>
+                    <div class="keyboard-row">
                         {
                             keyboard[0].iter().cloned().map(|key| html! {
                                 <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
@@ -257,7 +264,7 @@ impl Component for Model {
                             }).collect::<Html>()
                         }
                     </div>
-                    <div>
+                    <div class="keyboard-row keyboard-second">
                         {
                             keyboard[1].iter().cloned().map(|key| html! {
                                 <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
@@ -265,7 +272,7 @@ impl Component for Model {
                             }).collect::<Html>()
                         }
                     </div>
-                    <div>
+                    <div class="keyboard-row">
                         {
                             keyboard[2].iter().cloned().map(|key| html! {
                                 <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
@@ -274,7 +281,7 @@ impl Component for Model {
                         }
                         <button class={classes!("keyboard-button")}
                             onclick={link.callback(move |_| Msg::Backspace)}>{ "<x]" }</button>
-                        <button onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button>
+                        <button class={classes!("keyboard-button")} onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button>
                     </div>
                 </div>
             </div>
