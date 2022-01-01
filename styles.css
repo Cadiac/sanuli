@@ -1,0 +1,85 @@
+body {
+    font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
+    background-color: #121213;
+}
+
+header {
+    color: #d7dadc;
+}
+
+.title {
+    font-weight: 700;
+    font-size: 36px;
+    letter-spacing: 0.2rem;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.subtitle {
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: 0.2rem;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.game {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.board-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.board {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    width: 350px;
+    height: 420px;
+    grid-gap: 5px;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-gap: 5px;
+}
+
+.tile {
+    width: 100%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    line-height: 2rem;
+    font-weight: bold;
+    vertical-align: middle;
+    box-sizing: border-box;
+    background-color: grey;
+    color: white;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.in-word {
+    background-color: #b59f3b;
+}
+
+.not-in-word {
+    background-color: #3a3a3c;
+}
+
+.in-correct-position {
+    background-color: #538d4e;
+}
