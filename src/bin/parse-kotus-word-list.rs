@@ -1,7 +1,11 @@
 use std::fs;
 
-fn parse_word_list(data: String) -> Vec<String> {
+const ALLOWED_KEYS: [char; 29] = [
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
+    'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
+];
 
+fn parse_word_list(data: String) -> Vec<String> {
     let parts = data.split("<kotus-sanalista>\n").collect::<Vec<&str>>();
     let words = parts[1].split("</kotus-sanalista>").collect::<Vec<&str>>();
 
@@ -10,7 +14,12 @@ fn parse_word_list(data: String) -> Vec<String> {
     for line in words[0].lines() {
         let (word, _): (String, String) = serde_scan::scan!("<st><s>{}</s>{}" <- line).unwrap();
 
-        if word.chars().count() == 5 {
+        if word.chars().count() == 5
+            && word
+                .to_uppercase()
+                .chars()
+                .all(|c| ALLOWED_KEYS.contains(&c))
+        {
             word_list.push(word.to_uppercase());
         }
     }
@@ -19,7 +28,9 @@ fn parse_word_list(data: String) -> Vec<String> {
 }
 
 fn main() {
-    let filename = std::env::args().nth(1).expect("No path to word list file given");
+    let filename = std::env::args()
+        .nth(1)
+        .expect("No path to word list file given");
     let data = fs::read_to_string(filename).expect("Unable to read word list file");
 
     let word_list = parse_word_list(data);

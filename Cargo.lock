@@ -309,6 +309,8 @@ dependencies = [
  "getrandom",
  "rand",
  "serde_scan",
+ "wasm-bindgen",
+ "web-sys",
  "yew",
 ]
 
