@@ -60,7 +60,7 @@ pub enum CharacterState {
 impl Model {
     fn character_state_mappings(
         &self,
-        guess: &Vec<char>,
+        guess: &[char],
     ) -> [Option<&'static str>; 5] {
         let mut mappings = [Some("absent"); 5];
         let mut correct_counts: HashMap<char, i32> = HashMap::new();
@@ -88,17 +88,9 @@ impl Model {
     
                 let is_found_all = *correct_count == character_present_in_word;
     
-                if is_found_all {
-                    mappings[index] = Some("absent");
-                } else {
-                    if *present_count - *correct_count <= character_present_in_word {
-                        mappings[index] = Some("present");
-                    } else {
-                        mappings[index] = Some("absent");
-                    }
+                if !is_found_all && *present_count - *correct_count <= character_present_in_word {
+                    mappings[index] = Some("present");
                 }
-            } else {
-                mappings[index] = Some("absent");
             }
         }
 
