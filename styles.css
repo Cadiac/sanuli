@@ -20,6 +20,7 @@ body {
 
 .title {
     margin-top: 6px;
+    margin-bottom: 0px;
     color: #d7dadc;
     font-weight: 700;
     font-size: 16px;
