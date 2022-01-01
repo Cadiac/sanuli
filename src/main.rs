@@ -274,7 +274,7 @@ impl Component for Model {
                                         (0..5).map(|char_index| html! {
                                         <div class={classes!(
                                             "tile",
-                                            if guess_index == self.current_guess {
+                                            if self.is_guessing && guess_index == self.current_guess {
                                                 guess.get(char_index).and_then(|c| self.map_keyboard_state(*c))
                                             } else {
                                                 mappings[char_index]
