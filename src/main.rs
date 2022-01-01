@@ -1,26 +1,18 @@
-extern crate serde_scan;
-
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use yew::{
     classes, function_component, html, Callback, Children, Component, Context, Html, MouseEvent,
     Properties,
 };
 
-const WORDS: &str = include_str!("../vendor/kotus-sanalista_v1/kotus-sanalista_v1.xml");
+const WORDS: &str = include_str!("../word-list.txt");
 
-fn parse_words(input: &str) -> Vec<Vec<char>> {
-    let parts = input.split("<kotus-sanalista>\n").collect::<Vec<&str>>();
-    let words = parts[1].split("</kotus-sanalista>").collect::<Vec<&str>>();
-
+fn parse_words(words: &str) -> Vec<Vec<char>> {
     let mut word_list = Vec::new();
 
-    for line in words[0].lines() {
-        let (word, _): (String, String) = serde_scan::scan!("<st><s>{}</s>{}" <- line).unwrap();
-
+    for word in words.lines() {
         if word.chars().count() == 5 {
-            word_list.push(word.to_uppercase().chars().collect());
+            word_list.push(word.chars().collect());
         }
     }
 
