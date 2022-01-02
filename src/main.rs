@@ -15,6 +15,12 @@ const FORMS_LINK_TEMPLATE: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8
 const DEFAULT_WORD_LENGTH: usize = 5;
 const DEFAULT_MAX_GUESSES: usize = 6;
 
+const KEYBOARD_0: [char; 11] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å'];
+const KEYBOARD_1: [char; 11] = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'];
+const KEYBOARD_2: [char; 7] = ['Z', 'X', 'C', 'V', 'B', 'N', 'M'];
+
+const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
+
 fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
     words
         .lines()
@@ -96,12 +102,12 @@ impl Model {
         mappings
     }
 
-    fn map_keyboard_state(&self, character: char) -> Option<&'static str> {
-        if self.correct_characters.iter().any(|(c, _)| *c == character) {
+    fn map_keyboard_state(&self, character: &char) -> Option<&'static str> {
+        if self.correct_characters.iter().any(|(c, _)| c == character) {
             Some("correct")
-        } else if self.absent_characters.contains(&character) {
+        } else if self.absent_characters.contains(character) {
             Some("absent")
-        } else if self.present_characters.contains(&character) {
+        } else if self.present_characters.contains(character) {
             Some("present")
         } else {
             None
@@ -257,7 +263,7 @@ impl Component for Model {
                 if self.is_winner {
                     self.is_guessing = false;
                     self.streak += 1;
-                    self.message = String::from("Löysit sanan! 🥳");
+                    self.message = format!("Löysit sanan! {}", SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap());
                 } else if self.current_guess == self.max_guesses - 1 {
                     self.is_guessing = false;
                     self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
@@ -320,12 +326,6 @@ impl Component for Model {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
 
-        let keyboard = vec![
-            vec!['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å'],
-            vec!['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'],
-            vec!['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
-        ];
-
         html! {
             <div class="game">
                 <header>
@@ -351,7 +351,7 @@ impl Component for Model {
                                         <div class={classes!(
                                             "tile",
                                             if self.is_guessing && guess_index == self.current_guess {
-                                                guess.get(char_index).and_then(|c| self.map_keyboard_state(*c))
+                                                guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
                                             } else {
                                                 mappings[char_index]
                                             },
@@ -385,30 +385,37 @@ impl Component for Model {
                     </div>
                     <div class="keyboard-row">
                         {
-                            keyboard[0].iter().cloned().map(|key| html! {
-                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
-                                    onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
-                            }).collect::<Html>()
+                            KEYBOARD_0.iter().map(|key|
+                                html! {
+                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                            onclick={link.callback(move |_| Msg::KeyPress(*key))}>
+                                        { key }
+                                    </button>
+                                }).collect::<Html>()
                         }
                         <div class="spacer" />
                     </div>
                     <div class="keyboard-row">
                         <div class="spacer" />
                         {
-                            keyboard[1].iter().cloned().map(|key| html! {
-                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
-                                    onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
-                            }).collect::<Html>()
+                            KEYBOARD_1.iter().map(|key|
+                                html! {
+                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                            onclick={link.callback(move |_| Msg::KeyPress(*key))}>
+                                            { key }
+                                    </button>
+                                }).collect::<Html>()
                         }
                     </div>
                     <div class="keyboard-row">
                         <div class="spacer" />
                         <div class="spacer" />
                         {
-                            keyboard[2].iter().cloned().map(|key| html! {
-                                <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
-                                    onclick={link.callback(move |_| Msg::KeyPress(key))}>{ key }</button>
-                            }).collect::<Html>()
+                            KEYBOARD_2.iter().map(|key|
+                                html! {
+                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                        onclick={link.callback(move |_| Msg::KeyPress(*key))}>{ key }</button>
+                                }).collect::<Html>()
                         }
                         <button class={classes!("keyboard-button")}
                             onclick={link.callback(|_| Msg::Backspace)}>{ "⌫" }</button>
