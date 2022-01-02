@@ -121,6 +121,16 @@ a {
     text-transform: uppercase;
 }
 
+@media (min-width:320px) and (max-width:374px) {
+    .board {
+        width: 275px;
+        height: 330px;
+    }
+    .keyboard-button {
+        margin-right: 4px;
+    }
+}
+
 .row {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
