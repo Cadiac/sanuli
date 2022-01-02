@@ -148,26 +148,25 @@ impl Component for Model {
         let cb = ctx.link().callback(|e: KeyboardEvent| {
             if e.key().chars().count() == 1 {
                 let key = e.key().to_uppercase().chars().next().unwrap();
-                if ALLOWED_KEYS.contains(&key) {
+                if ALLOWED_KEYS.contains(&key) && !e.ctrl_key() && !e.alt_key() && !e.meta_key() {
+                    e.prevent_default();
                     Msg::KeyPress(key)
                 } else {
                     Msg::Noop
                 }
             } else if e.key() == "Backspace" {
+                e.prevent_default();
                 Msg::Backspace
             } else if e.key() == "Enter" {
+                e.prevent_default();
                 Msg::Guess
             } else {
                 Msg::Noop
             }
         });
 
-        // Create a Closure from a Box<dyn Fn> - this has to be 'static
         let listener =
-            Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e: KeyboardEvent| {
-                e.prevent_default();
-                cb.emit(e)
-            }));
+            Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e: KeyboardEvent| cb.emit(e)));
 
         window
             .add_event_listener_with_callback("keydown", listener.as_ref().unchecked_ref())
