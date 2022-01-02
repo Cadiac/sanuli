@@ -1,8 +1,8 @@
 use rand::seq::SliceRandom;
 use wasm_bindgen::{prelude::Closure, JsCast};
 
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
 
 const WORDS: &str = include_str!("../word-list.txt");
@@ -11,6 +11,7 @@ const ALLOWED_KEYS: [char; 29] = [
     'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
 ];
 const EMPTY: char = '\u{00a0}';
+const FORMS_LINK_TEMPLATE: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 
 fn parse_words(words: &str) -> Vec<Vec<char>> {
     let mut word_list = Vec::new();
@@ -37,6 +38,7 @@ struct Model {
 
     is_guessing: bool,
     is_winner: bool,
+    is_unknown: bool,
     message: String,
 
     present_characters: HashSet<char>,
@@ -58,10 +60,7 @@ pub enum CharacterState {
 }
 
 impl Model {
-    fn character_state_mappings(
-        &self,
-        guess: &[char],
-    ) -> [Option<&'static str>; 5] {
+    fn character_state_mappings(&self, guess: &[char]) -> [Option<&'static str>; 5] {
         let mut mappings = [Some("absent"); 5];
         let mut correct_counts: HashMap<char, i32> = HashMap::new();
         let mut present_counts: HashMap<char, i32> = HashMap::new();
@@ -78,16 +77,13 @@ impl Model {
                 continue;
             }
             if self.present_characters.contains(character) {
-                
                 let present_count = present_counts.entry(*character).or_insert(0);
                 let correct_count = correct_counts.entry(*character).or_insert(0);
-    
                 *present_count += 1;
-    
-                let character_present_in_word = self.word.iter().filter(|c| *c == character).count() as i32;
-    
+
+                let character_present_in_word =
+                    self.word.iter().filter(|c| *c == character).count() as i32;
                 let is_found_all = *correct_count == character_present_in_word;
-    
                 if !is_found_all && *present_count - *correct_count <= character_present_in_word {
                     mappings[index] = Some("present");
                 }
@@ -124,6 +120,7 @@ impl Component for Model {
             word_list,
             is_guessing: true,
             is_winner: false,
+            is_unknown: false,
             message: EMPTY.to_string(),
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
@@ -192,6 +189,7 @@ impl Component for Model {
                     return false;
                 }
 
+                self.is_unknown = false;
                 self.message = EMPTY.to_string();
                 self.guesses[self.current_guess].push(c);
 
@@ -202,6 +200,7 @@ impl Component for Model {
                     return false;
                 }
 
+                self.is_unknown = false;
                 self.message = EMPTY.to_string();
                 self.guesses[self.current_guess].pop();
 
@@ -214,10 +213,11 @@ impl Component for Model {
                 }
 
                 if !self.word_list.contains(&self.guesses[self.current_guess]) {
-                    self.message = String::from("Ei sanalistalla");
+                    self.is_unknown = true;
                     return true;
                 }
 
+                self.is_unknown = false;
                 self.is_winner = self.guesses[self.current_guess] == self.word;
 
                 for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
@@ -270,7 +270,7 @@ impl Component for Model {
 
                             html! {
                                 <div class="row">
-                                    {                                        
+                                    {
                                         (0..5).map(|char_index| html! {
                                         <div class={classes!(
                                             "tile",
@@ -291,7 +291,22 @@ impl Component for Model {
                 </div>
 
                 <div class="keyboard">
-                    <div class="message">{ &self.message }</div>
+                    <div class="message">{
+                        if self.is_unknown {
+                            html! {
+                                <span>{"Ei sanulistalla, "}
+                                    <a href={format!("{}{}",
+                                        FORMS_LINK_TEMPLATE,
+                                        self.guesses[self.current_guess].iter().collect::<String>().to_lowercase())}
+                                       target="_blank">{ "ehdota?" }
+                                    </a>
+                                </span>
+                            }
+                        } else {
+                            html! { <span>{ &self.message }</span> }
+                        }
+                    }
+                    </div>
                     <div class="keyboard-row">
                         {
                             keyboard[0].iter().cloned().map(|key| html! {
