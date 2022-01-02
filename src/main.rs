@@ -164,7 +164,10 @@ impl Component for Model {
 
         // Create a Closure from a Box<dyn Fn> - this has to be 'static
         let listener =
-            Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e: KeyboardEvent| cb.emit(e)));
+            Closure::<dyn Fn(KeyboardEvent)>::wrap(Box::new(move |e: KeyboardEvent| {
+                e.prevent_default();
+                cb.emit(e)
+            }));
 
         window
             .add_event_listener_with_callback("keydown", listener.as_ref().unchecked_ref())
