@@ -1,6 +1,10 @@
 # Sanuli
 
+![Sanuli](/static/sanuli-1200x630.png)
+
 A finnish version of [Wordle](https://www.powerlanguage.co.uk/wordle/) implemented in [Rust](https://www.rust-lang.org).
+
+Live version running at [sanuli.fi](https://sanuli.fi).
 
 ## Installing
 
@@ -16,9 +20,9 @@ cargo install wasm-bindgen-cli
 
 ## Generating word list
 
-A `word-list.txt` file in the root of this project containing uppercase 5 letter words is required.
+A `word-list.txt` file in the root of this project containing all uppercase 5 and 6 letter words is required.
 
-To obtain one, the [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) word list can be used, licensed under "[Attribution 3.0 Unported (CC BY 3.0)](https://creativecommons.org/licenses/by/3.0/deed.fi)".
+To obtain one, a word list like the "nykysuomen sanalista" by [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/), licensed with [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/deed.fi), can be used as a baseline.
 
 A parser for parsing `kotus-sanalista_v1.xml` file from [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) is included:
 
