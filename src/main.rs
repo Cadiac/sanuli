@@ -1,9 +1,9 @@
 use rand::seq::SliceRandom;
-use wasm_bindgen::{prelude::Closure, JsCast};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use yew::{classes, html, Component, Context, Html, KeyboardEvent};
+use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
+use yew::{classes, html, Component, Context, Html, KeyboardEvent};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const ALLOWED_KEYS: [char; 29] = [
@@ -12,9 +12,15 @@ const ALLOWED_KEYS: [char; 29] = [
 ];
 const EMPTY: char = '\u{00a0}';
 const FORMS_LINK_TEMPLATE: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
+const DEFAULT_WORD_LENGTH: usize = 5;
+const DEFAULT_MAX_GUESSES: usize = 6;
 
-fn parse_words(words: &str) -> Vec<Vec<char>> {
-    words.lines().map(|word| word.chars().collect()).collect()
+fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
+    words
+        .lines()
+        .filter(|word| word.chars().count() == word_length)
+        .map(|word| word.chars().collect())
+        .collect()
 }
 
 enum Msg {
@@ -25,11 +31,15 @@ enum Msg {
     NewGame,
     ToggleHelp,
     ToggleMenu,
+    ChangeWordLength(usize),
 }
 
 struct Model {
     word_list: Vec<Vec<char>>,
     word: Vec<char>,
+
+    word_length: usize,
+    max_guesses: usize,
 
     is_guessing: bool,
     is_winner: bool,
@@ -43,7 +53,7 @@ struct Model {
     correct_characters: HashSet<(char, usize)>,
     absent_characters: HashSet<char>,
 
-    guesses: [Vec<char>; 6],
+    guesses: Vec<Vec<char>>,
     current_guess: usize,
     streak: usize,
 
@@ -51,8 +61,8 @@ struct Model {
 }
 
 impl Model {
-    fn character_state_mappings(&self, guess: &[char]) -> [Option<&'static str>; 5] {
-        let mut mappings = [Some("absent"); 5];
+    fn character_state_mappings(&self, guess: &[char]) -> Vec<Option<&'static str>> {
+        let mut mappings = vec![Some("absent"); self.word_length];
         let mut correct_counts: HashMap<char, i32> = HashMap::new();
         let mut present_counts: HashMap<char, i32> = HashMap::new();
 
@@ -75,7 +85,9 @@ impl Model {
                 let character_present_in_word_count =
                     self.word.iter().filter(|c| *c == character).count() as i32;
                 let is_found_all = *correct_count == character_present_in_word_count;
-                if !is_found_all && *present_count - *correct_count <= character_present_in_word_count {
+                if !is_found_all
+                    && *present_count - *correct_count <= character_present_in_word_count
+                {
                     mappings[index] = Some("present");
                 }
             }
@@ -102,13 +114,19 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let word_list = parse_words(WORDS);
+        let word_list = parse_words(WORDS, DEFAULT_WORD_LENGTH);
 
         let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        let guesses = std::iter::repeat(Vec::with_capacity(DEFAULT_WORD_LENGTH))
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
 
         Self {
             word,
             word_list,
+
+            word_length: DEFAULT_WORD_LENGTH,
+            max_guesses: DEFAULT_MAX_GUESSES,
 
             is_guessing: true,
             is_winner: false,
@@ -121,14 +139,7 @@ impl Component for Model {
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
             absent_characters: HashSet::new(),
-            guesses: [
-                Vec::with_capacity(5),
-                Vec::with_capacity(5),
-                Vec::with_capacity(5),
-                Vec::with_capacity(5),
-                Vec::with_capacity(5),
-                Vec::with_capacity(5),
-            ],
+            guesses,
             current_guess: 0,
             streak: 0,
             keyboard_listener: None,
@@ -184,7 +195,7 @@ impl Component for Model {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::KeyPress(c) => {
-                if !self.is_guessing || self.guesses[self.current_guess].len() >= 5 {
+                if !self.is_guessing || self.guesses[self.current_guess].len() >= self.word_length {
                     return false;
                 }
 
@@ -218,7 +229,7 @@ impl Component for Model {
                 false
             }
             Msg::Guess => {
-                if self.guesses[self.current_guess].len() != 5 {
+                if self.guesses[self.current_guess].len() != self.word_length {
                     self.message = String::from("Liian vähän kirjaimia!");
                     return true;
                 }
@@ -247,7 +258,7 @@ impl Component for Model {
                     self.is_guessing = false;
                     self.streak += 1;
                     self.message = String::from("Löysit sanan! 🥳");
-                } else if self.current_guess == 5 {
+                } else if self.current_guess == self.max_guesses - 1 {
                     self.is_guessing = false;
                     self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
                     self.streak = 0;
@@ -259,7 +270,11 @@ impl Component for Model {
                 true
             }
             Msg::NewGame => {
-                self.word = self.word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+                self.word = self
+                    .word_list
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
+                    .clone();
 
                 self.is_guessing = true;
                 self.is_winner = false;
@@ -268,21 +283,16 @@ impl Component for Model {
                 self.message = EMPTY.to_string();
 
                 self.current_guess = 0;
-                self.guesses = [
-                    Vec::with_capacity(5),
-                    Vec::with_capacity(5),
-                    Vec::with_capacity(5),
-                    Vec::with_capacity(5),
-                    Vec::with_capacity(5),
-                    Vec::with_capacity(5),
-                ];
+                self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                    .take(self.max_guesses)
+                    .collect::<Vec<_>>();
 
                 self.correct_characters = HashSet::new();
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
 
                 true
-            },
+            }
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
 
@@ -292,6 +302,17 @@ impl Component for Model {
                 self.is_menu_visible = !self.is_menu_visible;
 
                 true
+            }
+            Msg::ChangeWordLength(new_length) => {
+                let link = ctx.link();
+
+                self.word_length = new_length;
+                self.word_list = parse_words(WORDS, self.word_length);
+                self.streak = 0;
+
+                link.send_message(Msg::NewGame);
+
+                false
             }
         }
     }
@@ -316,17 +337,17 @@ impl Component for Model {
                             html! { <h1 class="title">{ "Sanuli" }</h1>}
                         }
                     }
-                    <nav onclick={link.callback(|_| Msg::ToggleMenu)} class="title-icon">{EMPTY}</nav>
+                    <nav onclick={link.callback(|_| Msg::ToggleMenu)} class="title-icon">{"≡"}</nav>
                 </header>
                 <div class="board-container">
-                    <div class="board">
+                    <div class={format!("board-{}", self.max_guesses)}>
                         { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
                             let mappings = self.character_state_mappings(guess);
 
                             html! {
-                                <div class="row">
+                                <div class={format!("row-{}", self.word_length)}>
                                     {
-                                        (0..5).map(|char_index| html! {
+                                        (0..self.word_length).map(|char_index| html! {
                                         <div class={classes!(
                                             "tile",
                                             if self.is_guessing && guess_index == self.current_guess {
@@ -421,7 +442,7 @@ impl Component for Model {
                                 <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
                                 <p>{"Jokaisen yrityksen jälkeen arvatut kirjaimet vaihtavat väriään."}</p>
 
-                                <div class="row example">
+                                <div class="row-5 example">
                                     <div class={classes!("tile", "correct")}>{"K"}</div>
                                     <div class={classes!("tile", "absent")}>{"O"}</div>
                                     <div class={classes!("tile", "present")}>{"I"}</div>
@@ -441,6 +462,27 @@ impl Component for Model {
                                     <a href={FORMS_LINK_TEMPLATE}>{"täällä"}</a>
                                     {"."}
                                 </p>
+                            </div>
+                        }
+                    } else {
+                        html! {}
+                    }
+                }
+
+                {
+                    if self.is_menu_visible {
+                        html! {
+                            <div class="modal">
+                                <span onclick={link.callback(|_| Msg::ToggleMenu)} class="modal-close">{"✖"}</span>
+                                <p class="title">{"Sanojen pituus:"}</p>
+                                <button class={classes!("select", (self.word_length == 5).then(|| Some("select-active")))}
+                                    onclick={link.callback(|_| Msg::ChangeWordLength(5))}>
+                                    {"5 merkkiä"}
+                                </button>
+                                <button class={classes!("select", (self.word_length == 6).then(|| Some("select-active")))}
+                                    onclick={link.callback(|_| Msg::ChangeWordLength(6))}>
+                                    {"6 merkkiä"}
+                                </button>
                             </div>
                         }
                     } else {

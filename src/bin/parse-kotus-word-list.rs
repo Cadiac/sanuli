@@ -14,7 +14,9 @@ fn parse_word_list(data: String) -> Vec<String> {
     for line in words[0].lines() {
         let (word, _): (String, String) = serde_scan::scan!("<st><s>{}</s>{}" <- line).unwrap();
 
-        if word.chars().count() == 5
+        let count = word.chars().count();
+
+        if (count == 6 || count == 5)
             && word
                 .to_uppercase()
                 .chars()

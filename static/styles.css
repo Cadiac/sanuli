@@ -120,7 +120,7 @@ a {
     overflow: hidden;
 }
 
-.board {
+.board-6 {
     display: grid;
     grid-template-rows: repeat(6, 1fr);
     width: 350px;
@@ -180,7 +180,7 @@ a {
 }
 
 @media (min-width:320px) and (max-width:374px) {
-    .board {
+    .board-6 {
         width: 275px;
         height: 330px;
     }
@@ -189,9 +189,15 @@ a {
     }
 }
 
-.row {
+.row-5 {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
+    grid-gap: 5px;
+}
+
+.row-6 {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
     grid-gap: 5px;
 }
 
@@ -242,4 +248,28 @@ a {
 
 .current.correct {
     border: 5px solid var(--correct);
+}
+
+.select {
+    height: 50px;
+
+    background-color: var(--background);
+    border: 2px solid var(--unknown);
+    border-radius: 6px;
+    color: var(--white);
+
+    cursor: pointer;
+    user-select: none;
+
+    font-weight: bold;
+    padding: 0.5em 0.5em;
+    margin-right: 6px;
+    margin-top: 20px;
+
+    text-transform: uppercase;
+}
+
+.select-active {
+    background-color: var(--absent);
+    border: 2px solid var(--correct);
 }
