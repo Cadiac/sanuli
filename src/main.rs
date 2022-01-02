@@ -40,6 +40,7 @@ struct Model {
 
     guesses: [Vec<char>; 6],
     current_guess: usize,
+    streak: usize,
 
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
 }
@@ -119,6 +120,7 @@ impl Component for Model {
                 Vec::with_capacity(5),
             ],
             current_guess: 0,
+            streak: 0,
             keyboard_listener: None,
         }
     }
@@ -233,10 +235,12 @@ impl Component for Model {
 
                 if self.is_winner {
                     self.is_guessing = false;
+                    self.streak += 1;
                     self.message = String::from("Löysit sanan! 🥳");
                 } else if self.current_guess == 5 {
                     self.is_guessing = false;
                     self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
+                    self.streak = 0;
                 } else {
                     self.message = EMPTY.to_string();
                     self.current_guess += 1;
@@ -283,8 +287,15 @@ impl Component for Model {
 
         html! {
             <div class="game">
-                <header>
-                    <h1 class="title">{ "Sanuli" }</h1>
+                <header>{
+                    if self.streak > 10 {
+                        html! { <h1 class="title">{format!("Sanuli — Putki: {} 🔥", self.streak)}</h1> }
+                    } else if self.streak > 0 {
+                        html! { <h1 class="title">{format!("Sanuli — Putki: {}", self.streak)}</h1> }
+                    } else {
+                        html! { <h1 class="title">{ "Sanuli" }</h1>}
+                    }
+                }
                 </header>
                 <div class="board-container">
                     <div class="board">
