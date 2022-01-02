@@ -14,22 +14,15 @@ const EMPTY: char = '\u{00a0}';
 const FORMS_LINK_TEMPLATE: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 
 fn parse_words(words: &str) -> Vec<Vec<char>> {
-    let mut word_list = Vec::new();
-
-    for word in words.lines() {
-        if word.chars().count() == 5 {
-            word_list.push(word.chars().collect());
-        }
-    }
-
-    word_list
+    words.lines().map(|word| word.chars().collect()).collect()
 }
 
 enum Msg {
     KeyPress(char),
     Backspace,
+    Enter,
     Guess,
-    Noop,
+    NewGame
 }
 
 struct Model {
@@ -51,14 +44,6 @@ struct Model {
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum CharacterState {
-    Unknown,
-    Absent,
-    Present,
-    Correct,
-}
-
 impl Model {
     fn character_state_mappings(&self, guess: &[char]) -> [Option<&'static str>; 5] {
         let mut mappings = [Some("absent"); 5];
@@ -77,14 +62,14 @@ impl Model {
                 continue;
             }
             if self.present_characters.contains(character) {
-                let present_count = present_counts.entry(*character).or_insert(0);
                 let correct_count = correct_counts.entry(*character).or_insert(0);
+                let present_count = present_counts.entry(*character).or_insert(0);
                 *present_count += 1;
 
-                let character_present_in_word =
+                let character_present_in_word_count =
                     self.word.iter().filter(|c| *c == character).count() as i32;
-                let is_found_all = *correct_count == character_present_in_word;
-                if !is_found_all && *present_count - *correct_count <= character_present_in_word {
+                let is_found_all = *correct_count == character_present_in_word_count;
+                if !is_found_all && *present_count - *correct_count <= character_present_in_word_count {
                     mappings[index] = Some("present");
                 }
             }
@@ -145,23 +130,23 @@ impl Component for Model {
 
         let window: web_sys::Window = web_sys::window().expect("window not available");
 
-        let cb = ctx.link().callback(|e: KeyboardEvent| {
+        let cb = ctx.link().batch_callback(|e: KeyboardEvent| {
             if e.key().chars().count() == 1 {
                 let key = e.key().to_uppercase().chars().next().unwrap();
                 if ALLOWED_KEYS.contains(&key) && !e.ctrl_key() && !e.alt_key() && !e.meta_key() {
                     e.prevent_default();
-                    Msg::KeyPress(key)
+                    Some(Msg::KeyPress(key))
                 } else {
-                    Msg::Noop
+                    None
                 }
             } else if e.key() == "Backspace" {
                 e.prevent_default();
-                Msg::Backspace
+                Some(Msg::Backspace)
             } else if e.key() == "Enter" {
                 e.prevent_default();
-                Msg::Guess
+                Some(Msg::Enter)
             } else {
-                Msg::Noop
+                None
             }
         });
 
@@ -184,7 +169,7 @@ impl Component for Model {
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::KeyPress(c) => {
                 if !self.is_guessing || self.guesses[self.current_guess].len() >= 5 {
@@ -207,6 +192,18 @@ impl Component for Model {
                 self.guesses[self.current_guess].pop();
 
                 true
+            }
+
+            Msg::Enter => {
+                let link = ctx.link();
+
+                if !self.is_guessing {
+                    link.send_message(Msg::NewGame);
+                } else {
+                    link.send_message(Msg::Guess);
+                }
+
+                false
             }
             Msg::Guess => {
                 if self.guesses[self.current_guess].len() != 5 {
@@ -247,7 +244,31 @@ impl Component for Model {
 
                 true
             }
-            Msg::Noop => false,
+            Msg::NewGame => {
+                self.word = self.word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+
+                self.is_guessing = true;
+                self.is_winner = false;
+                self.is_unknown = false;
+
+                self.message = EMPTY.to_string();
+
+                self.current_guess = 0;
+                self.guesses = [
+                    Vec::with_capacity(5),
+                    Vec::with_capacity(5),
+                    Vec::with_capacity(5),
+                    Vec::with_capacity(5),
+                    Vec::with_capacity(5),
+                    Vec::with_capacity(5),
+                ];
+
+                self.correct_characters = HashSet::new();
+                self.present_characters = HashSet::new();
+                self.absent_characters = HashSet::new();
+
+                true
+            }
         }
     }
 
@@ -337,8 +358,14 @@ impl Component for Model {
                             }).collect::<Html>()
                         }
                         <button class={classes!("keyboard-button")}
-                            onclick={link.callback(move |_| Msg::Backspace)}>{ "⌫" }</button>
-                        <button class={classes!("keyboard-button")} onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button>
+                            onclick={link.callback(|_| Msg::Backspace)}>{ "⌫" }</button>
+                        {
+                            if self.is_guessing {
+                                html! { <button class={classes!("keyboard-button")} onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button> }
+                            } else {
+                                html! { <button class={classes!("keyboard-button", "correct")} onclick={link.callback(|_| Msg::NewGame)}>{ "UUSI?" }</button> }
+                            }
+                        }
                         <div class="spacer" />
                         <div class="spacer" />
                     </div>
