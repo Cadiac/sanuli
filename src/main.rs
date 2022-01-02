@@ -372,9 +372,19 @@ impl Component for Model {
                             onclick={link.callback(|_| Msg::Backspace)}>{ "⌫" }</button>
                         {
                             if self.is_guessing {
-                                html! { <button class={classes!("keyboard-button")} onclick={link.callback(|_| Msg::Guess)}>{ "ARVAA" }</button> }
+                                html! {
+                                    <button class={classes!("keyboard-button")}
+                                            onclick={link.callback(|_| Msg::Guess)}>
+                                        { "ARVAA" }
+                                    </button>
+                                }
                             } else {
-                                html! { <button class={classes!("keyboard-button", "correct")} onclick={link.callback(|_| Msg::NewGame)}>{ "UUSI?" }</button> }
+                                html! {
+                                    <button class={classes!("keyboard-button", "correct")}
+                                            onclick={link.callback(|_| Msg::NewGame)}>
+                                        { "UUSI?" }
+                                    </button>
+                                }
                             }
                         }
                         <div class="spacer" />
