@@ -3,6 +3,9 @@
     --absent: #3e3e3e;
     --correct: #6aaa64;
     --unknown: #818384;
+    --background: #121212;
+    --text: #d7dadc;
+    --white: #ffffff;
     font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -15,13 +18,72 @@ body {
     margin: 0;
     padding: 0;
     overflow-y: hidden;
-    background-color: #121212;
+    background-color: var(--background);
+}
+
+hr {
+    background-color: var(--unknown);
+}
+
+#app {
+    height: 100%;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1;
+    flex-grow: 1;
+    max-width: 390px;
+    color: var(--white);
+    font-size: 16px;
+    max-height: 80%;
+    overflow-y: auto;
+    margin: 30px;
+    padding: 20px;
+    border: solid 2px var(--absent);
+    background-color: var(--background);
+}
+
+.modal-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0;
+    margin: 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text);
+}
+
+.example {
+    height: 40px;
+    max-width: 200px;
+}
+
+header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.title-icon {
+    margin: 6px 12px 0px 12px;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.2rem;
+    text-transform: uppercase;
+    text-align: center;
 }
 
 .title {
     margin-top: 6px;
     margin-bottom: 0px;
-    color: #d7dadc;
+    color: var(--text);
     font-weight: 700;
     font-size: 16px;
     letter-spacing: 0.2rem;
@@ -30,11 +92,11 @@ body {
 }
 
 a {
-    color: #d7dadc;
+    color: var(--text);
 }
 
 .message {
-    color: #d7dadc;
+    color: var(--text);
     margin-top: 10px;
     margin-bottom: 10px;
     font-weight: 700;
@@ -108,7 +170,7 @@ a {
     background-color: var(--unknown);
     border: none;
     border-radius: 6px;
-    color: white;
+    color: var(--white);
 
     touch-action: manipulation;
     cursor: pointer;
@@ -147,8 +209,8 @@ a {
     font-weight: bold;
     vertical-align: middle;
     box-sizing: border-box;
-    background-color: #121213;
-    color: white;
+    background-color: var(--background);
+    color: var(--white);
     text-transform: uppercase;
     user-select: none;
     border: 2px solid #3a3a3c;

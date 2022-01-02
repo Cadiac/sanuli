@@ -1,6 +1,6 @@
 use rand::seq::SliceRandom;
 use wasm_bindgen::{prelude::Closure, JsCast};
-
+use gloo::utils as gloo_utils;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
@@ -22,7 +22,9 @@ enum Msg {
     Backspace,
     Enter,
     Guess,
-    NewGame
+    NewGame,
+    ToggleHelp,
+    ToggleMenu,
 }
 
 struct Model {
@@ -33,6 +35,9 @@ struct Model {
     is_winner: bool,
     is_unknown: bool,
     message: String,
+
+    is_help_visible: bool,
+    is_menu_visible: bool,
 
     present_characters: HashSet<char>,
     correct_characters: HashSet<(char, usize)>,
@@ -104,9 +109,14 @@ impl Component for Model {
         Self {
             word,
             word_list,
+
             is_guessing: true,
             is_winner: false,
             is_unknown: false,
+
+            is_menu_visible: false,
+            is_help_visible: false,
+
             message: EMPTY.to_string(),
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
@@ -272,6 +282,16 @@ impl Component for Model {
                 self.absent_characters = HashSet::new();
 
                 true
+            },
+            Msg::ToggleHelp => {
+                self.is_help_visible = !self.is_help_visible;
+
+                true
+            }
+            Msg::ToggleMenu => {
+                self.is_menu_visible = !self.is_menu_visible;
+
+                true
             }
         }
     }
@@ -287,15 +307,16 @@ impl Component for Model {
 
         html! {
             <div class="game">
-                <header>{
-                    if self.streak > 10 {
-                        html! { <h1 class="title">{format!("Sanuli — Putki: {} 🔥", self.streak)}</h1> }
-                    } else if self.streak > 0 {
-                        html! { <h1 class="title">{format!("Sanuli — Putki: {}", self.streak)}</h1> }
-                    } else {
-                        html! { <h1 class="title">{ "Sanuli" }</h1>}
+                <header>
+                    <nav onclick={link.callback(|_| Msg::ToggleHelp)} class="title-icon">{"?"}</nav>
+                    {
+                        if self.streak > 0 {
+                            html! { <h1 class="title">{format!("Sanuli — Putki: {}", self.streak)}</h1> }
+                        } else {
+                            html! { <h1 class="title">{ "Sanuli" }</h1>}
+                        }
                     }
-                }
+                    <nav onclick={link.callback(|_| Msg::ToggleMenu)} class="title-icon">{EMPTY}</nav>
                 </header>
                 <div class="board-container">
                     <div class="board">
@@ -391,11 +412,51 @@ impl Component for Model {
                         <div class="spacer" />
                     </div>
                 </div>
+
+                {
+                    if self.is_help_visible {
+                        html! {
+                            <div class="modal">
+                                <span onclick={link.callback(|_| Msg::ToggleHelp)} class="modal-close">{"✖"}</span>
+                                <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
+                                <p>{"Jokaisen yrityksen jälkeen arvatut kirjaimet vaihtavat väriään."}</p>
+
+                                <div class="row example">
+                                    <div class={classes!("tile", "correct")}>{"K"}</div>
+                                    <div class={classes!("tile", "absent")}>{"O"}</div>
+                                    <div class={classes!("tile", "present")}>{"I"}</div>
+                                    <div class={classes!("tile", "absent")}>{"R"}</div>
+                                    <div class={classes!("tile", "absent")}>{"A"}</div>
+                                </div>
+
+                                <p><span class="present">{"Keltainen"}</span>{": kirjain löytyy kätketystä sanasta, mutta on arvauksessa väärällä paikalla."}</p>
+                                <p><span class="correct">{"Vihreä"}</span>{": kirjain on arvauksessa oikealla paikalla."}</p>
+                                <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
+
+                                <p>
+                                    {"Käytetyn sanalistan pohjalla on Kotimaisten kielten keskuksen (Kotus) julkaisemaa "}
+                                    <a href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
+                                    {" lisensoitu nykysuomen sanalista, josta on poimittu ne viisikirjaimiset sanat, jotka eivät sisällä vieraskielisiä kirjaimia. "}
+                                    {"Sanalistaa on muokattu käyttäjien ehdotusten mukaan, ja voit jättää omat ehdotuksesi sanuihin "}
+                                    <a href={FORMS_LINK_TEMPLATE}>{"täällä"}</a>
+                                    {"."}
+                                </p>
+                            </div>
+                        }
+                    } else {
+                        html! {}
+                    }
+                }
             </div>
         }
     }
 }
 
 fn main() {
-    yew::start_app::<Model>();
+    // yew::start_app::<Model>();
+    let app_element = gloo_utils::document()
+        .get_element_by_id("app")
+        .expect("a #app element");
+
+    yew::start_app_in_element::<Model>(app_element);
 }
