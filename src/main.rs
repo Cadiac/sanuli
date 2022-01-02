@@ -1,9 +1,9 @@
 use rand::seq::SliceRandom;
 use wasm_bindgen::{prelude::Closure, JsCast};
-use gloo::utils as gloo_utils;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
+use web_sys::{window, Window};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const ALLOWED_KEYS: [char; 29] = [
@@ -140,7 +140,7 @@ impl Component for Model {
             return;
         }
 
-        let window: web_sys::Window = web_sys::window().expect("window not available");
+        let window: Window = window().expect("window not available");
 
         let cb = ctx.link().batch_callback(|e: KeyboardEvent| {
             if e.key().chars().count() == 1 {
@@ -174,7 +174,7 @@ impl Component for Model {
     fn destroy(&mut self, _: &Context<Self>) {
         // remove the keyboard listener
         if let Some(listener) = self.keyboard_listener.take() {
-            let window: web_sys::Window = web_sys::window().expect("window not available");
+            let window: Window = window().expect("window not available");
             window
                 .remove_event_listener_with_callback("keydown", listener.as_ref().unchecked_ref())
                 .unwrap();
@@ -453,10 +453,5 @@ impl Component for Model {
 }
 
 fn main() {
-    // yew::start_app::<Model>();
-    let app_element = gloo_utils::document()
-        .get_element_by_id("app")
-        .expect("a #app element");
-
-    yew::start_app_in_element::<Model>(app_element);
+    yew::start_app::<Model>();
 }

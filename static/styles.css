@@ -25,10 +25,6 @@ hr {
     background-color: var(--unknown);
 }
 
-#app {
-    height: 100%;
-}
-
 .modal {
     position: fixed;
     z-index: 1;

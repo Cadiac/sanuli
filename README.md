@@ -16,17 +16,17 @@ cargo install wasm-bindgen-cli
 
 ## Generating word list
 
-A `word-list.txt` file containing upper case 5 letter words is required.
+A `word-list.txt` file in the root of this project containing uppercase 5 letter words is required.
 
 To obtain one, the [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) word list can be used, licensed under "[Attribution 3.0 Unported (CC BY 3.0)](https://creativecommons.org/licenses/by/3.0/deed.fi)".
 
-A parser for the `kotus-sanalista_v1.xml` file is included:
+A parser for parsing `kotus-sanalista_v1.xml` file from [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) is included:
 
 ```bash
 $ cargo run --bin parse-kotus-word-list your/path/to/kotus-sanalista_v1.xml
 ```
 
-which creates a `word-list.txt` file in this project's root directory.
+which creates a `word-list.txt` file in the working directory.
 
 ## Development
 
@@ -36,4 +36,12 @@ For development, start the web server with
 $ trunk serve
 ```
 
-This should run the UI at 0.0.0.0:8080 with hot reload on code changes.
+This should make the UI available at 0.0.0.0:8080 with hot reload on code changes.
+
+## Release build
+
+```
+trunk build --release
+```
+
+and copy the produced `dist` directory to the target server.
