@@ -11,7 +11,8 @@ const ALLOWED_KEYS: [char; 29] = [
     'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
 ];
 const EMPTY: char = '\u{00a0}';
-const FORMS_LINK_TEMPLATE: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
+const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
+const FORMS_LINK_TEMPLATE_DEL: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Poistoa&entry.560255602=";
 const DEFAULT_WORD_LENGTH: usize = 5;
 const DEFAULT_MAX_GUESSES: usize = 6;
 
@@ -116,12 +117,13 @@ impl Model {
 
     fn handle_guess(&mut self) -> bool {
         if self.guesses[self.current_guess].len() != self.word_length {
-            self.message = String::from("Liian vähän kirjaimia!");
+            self.message = "Liian vähän kirjaimia!".to_owned();
             return true;
         }
 
         if !self.word_list.contains(&self.guesses[self.current_guess]) {
             self.is_unknown = true;
+            self.message = "Ei sanulistalla.".to_owned();
             return true;
         }
 
@@ -499,22 +501,30 @@ impl Component for Model {
                 </div>
 
                 <div class="keyboard">
-                    <div class="message">{
-                        if self.is_unknown {
-                            html! {
-                                <span>{"Ei sanulistalla, "}
-                                    <a href={format!("{}{}",
-                                        FORMS_LINK_TEMPLATE,
-                                        self.guesses[self.current_guess].iter().collect::<String>().to_lowercase())}
-                                       target="_blank">{ "ehdota?" }
+                    <div class="message">
+                        { &self.message }
+                        <div class="message-small">{{
+                            let word = self.guesses[self.current_guess].iter().collect::<String>();
+                        
+                            if self.is_unknown {
+                                html! {
+                                    <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, word)}
+                                        target="_blank">{ "Ehdota lisäystä?" }
                                     </a>
-                                </span>
+                                }
+                            } else if !self.is_winner & !self.is_guessing {
+                                html! {
+                                    <a href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
+                                        target="_blank">{ "Ehdota poistoa?" }
+                                    </a>
+                                }
+                            } else {
+                                html! {}
                             }
-                        } else {
-                            html! { <span>{ &self.message }</span> }
-                        }
-                    }
+                        }}
+                        </div>
                     </div>
+
                     <div class="keyboard-row">
                         {
                             KEYBOARD_0.iter().map(|key|
@@ -598,7 +608,7 @@ impl Component for Model {
                                     <a href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
                                     {" lisensoitu nykysuomen sanalista, josta on poimittu ne viisikirjaimiset sanat, jotka eivät sisällä vieraskielisiä kirjaimia. "}
                                     {"Sanalistaa on muokattu käyttäjien ehdotusten mukaan, ja voit jättää omat ehdotuksesi sanuihin "}
-                                    <a href={FORMS_LINK_TEMPLATE}>{"täällä"}</a>
+                                    <a href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                                     {"."}
                                 </p>
                             </div>

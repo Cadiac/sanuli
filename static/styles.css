@@ -93,11 +93,25 @@ a {
 
 .message {
     color: var(--text);
-    margin-top: 10px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    min-height: 39px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.2rem;
+    text-transform: uppercase;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.message-small {
+    color: var(--text);
+    margin-top: 0px;
     margin-bottom: 10px;
     font-weight: 700;
-    font-size: 16px;
-    min-height: 26px;
+    font-size: 10px;
     letter-spacing: 0.2rem;
     text-transform: uppercase;
     text-align: center;
@@ -180,6 +194,9 @@ a {
 }
 
 @media (min-width:320px) and (max-width:374px) {
+    .board-container {
+        align-items: flex-start;
+    }
     .board-6 {
         width: 275px;
         height: 330px;
