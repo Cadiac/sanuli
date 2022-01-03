@@ -519,7 +519,7 @@ impl Component for Model {
                         {
                             KEYBOARD_0.iter().map(|key|
                                 html! {
-                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                    <button data-nosnippet="" class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                             onclick={link.callback(move |_| Msg::KeyPress(*key))}>
                                         { key }
                                     </button>
@@ -532,7 +532,7 @@ impl Component for Model {
                         {
                             KEYBOARD_1.iter().map(|key|
                                 html! {
-                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                    <button data-nosnippet="" class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                             onclick={link.callback(move |_| Msg::KeyPress(*key))}>
                                             { key }
                                     </button>
@@ -545,23 +545,23 @@ impl Component for Model {
                         {
                             KEYBOARD_2.iter().map(|key|
                                 html! {
-                                    <button class={classes!("keyboard-button", self.map_keyboard_state(key))}
+                                    <button data-nosnippet="" class={classes!("keyboard-button", self.map_keyboard_state(key))}
                                         onclick={link.callback(move |_| Msg::KeyPress(*key))}>{ key }</button>
                                 }).collect::<Html>()
                         }
-                        <button class={classes!("keyboard-button")}
+                        <button data-nosnippet="" class={classes!("keyboard-button")}
                             onclick={link.callback(|_| Msg::Backspace)}>{ "⌫" }</button>
                         {
                             if self.is_guessing {
                                 html! {
-                                    <button class={classes!("keyboard-button")}
+                                    <button data-nosnippet="" class={classes!("keyboard-button")}
                                             onclick={link.callback(|_| Msg::Guess)}>
                                         { "ARVAA" }
                                     </button>
                                 }
                             } else {
                                 html! {
-                                    <button class={classes!("keyboard-button", "correct")}
+                                    <button data-nosnippet="" class={classes!("keyboard-button", "correct")}
                                             onclick={link.callback(|_| Msg::NewGame)}>
                                         { "UUSI?" }
                                     </button>
