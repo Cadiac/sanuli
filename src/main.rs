@@ -1,7 +1,7 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use wasm_bindgen::{prelude::Closure, JsCast};
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{window, Window};
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
 
@@ -113,6 +113,171 @@ impl Model {
             None
         }
     }
+
+    fn handle_guess(&mut self) -> bool {
+        if self.guesses[self.current_guess].len() != self.word_length {
+            self.message = String::from("Liian vähän kirjaimia!");
+            return true;
+        }
+
+        if !self.word_list.contains(&self.guesses[self.current_guess]) {
+            self.is_unknown = true;
+            return true;
+        }
+
+        self.is_unknown = false;
+        self.is_winner = self.guesses[self.current_guess] == self.word;
+
+        for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
+            if self.word[index] == *character {
+                self.correct_characters.insert((*character, index));
+            }
+
+            if self.word.contains(character) {
+                self.present_characters.insert(*character);
+            } else {
+                self.absent_characters.insert(*character);
+            }
+        }
+
+        if self.is_winner {
+            self.is_guessing = false;
+            self.streak += 1;
+            self.message = format!(
+                "Löysit sanan! {}",
+                SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
+            );
+        } else if self.current_guess == self.max_guesses - 1 {
+            self.is_guessing = false;
+            self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
+            self.streak = 0;
+        } else {
+            self.message = EMPTY.to_string();
+            self.current_guess += 1;
+        }
+
+        let _result = self.persist_guess();
+
+        true
+    }
+
+    fn persist_guess(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("streak", format!("{}", self.streak).as_str())?;
+            local_storage.set_item("is_guessing", format!("{}", self.is_guessing).as_str())?;
+            local_storage.set_item("is_winner", format!("{}", self.is_winner).as_str())?;
+            local_storage.set_item("message", &self.message)?;
+            local_storage.set_item("current_guess", format!("{}", self.current_guess).as_str())?;
+            local_storage.set_item(
+                "guesses",
+                &self
+                    .guesses
+                    .iter()
+                    .map(|guess| guess.iter().collect::<String>())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn persist_new_game(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("word", &self.word.iter().collect::<String>())?;
+            local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
+            local_storage.remove_item("is_guessing")?;
+            local_storage.remove_item("is_winner")?;
+            local_storage.remove_item("message")?;
+            local_storage.remove_item("current_guess")?;
+            local_storage.remove_item("guesses")?;
+        }
+
+        Ok(())
+    }
+
+    fn rehydrate(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        if let Some(local_storage) = window.local_storage().expect("local storage not available") {
+            let word_length_item = local_storage.get_item("word_length")?;
+            if let Some(word_length_str) = word_length_item {
+                if let Ok(word_length) = word_length_str.parse::<usize>() {
+                    if word_length != self.word_length {
+                        self.word_list = parse_words(WORDS, word_length);
+                    }
+                    self.word_length = word_length;
+                }
+            }
+
+            let word = local_storage.get_item("word")?;
+            if let Some(word) = word {
+                self.word = word.chars().collect();
+            } else {
+                local_storage.set_item("word", &self.word.iter().collect::<String>())?;
+            }
+
+            let streak_item = local_storage.get_item("streak")?;
+            if let Some(streak_str) = streak_item {
+                if let Ok(streak) = streak_str.parse::<usize>() {
+                    self.streak = streak;
+                }
+            }
+
+            let is_guessing_item = local_storage.get_item("is_guessing")?;
+            if let Some(is_guessing_str) = is_guessing_item {
+                if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
+                    self.is_guessing = is_guessing;
+                }
+            }
+
+            let is_winner_item = local_storage.get_item("is_winner")?;
+            if let Some(is_winner_str) = is_winner_item {
+                if let Ok(is_winner) = is_winner_str.parse::<bool>() {
+                    self.is_winner = is_winner;
+                }
+            }
+
+            let message_item = local_storage.get_item("message")?;
+            if let Some(message_str) = message_item {
+                self.message = message_str;
+            }
+
+            let current_guess_item = local_storage.get_item("current_guess")?;
+            if let Some(current_guess_str) = current_guess_item {
+                if let Ok(current_guess) = current_guess_str.parse::<usize>() {
+                    self.current_guess = current_guess;
+                }
+            }
+
+            let guesses_item = local_storage.get_item("guesses")?;
+            if let Some(guesses_str) = guesses_item {
+                let previous_guesses = guesses_str
+                    .split(',')
+                    .map(|guess| guess.chars().collect());
+
+                for (guess_index, guess) in previous_guesses.enumerate() {
+                    self.guesses[guess_index] = guess;
+
+                    for (index, character) in self.guesses[guess_index].iter().enumerate() {
+                        if self.word[index] == *character {
+                            self.correct_characters.insert((*character, index));
+                        }
+                        if self.word.contains(character) {
+                            self.present_characters.insert(*character);
+                        } else {
+                            self.absent_characters.insert(*character);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Component for Model {
@@ -127,7 +292,7 @@ impl Component for Model {
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
 
-        Self {
+        let mut initial_state = Self {
             word,
             word_list,
 
@@ -149,7 +314,11 @@ impl Component for Model {
             current_guess: 0,
             streak: 0,
             keyboard_listener: None,
-        }
+        };
+
+        let _result = initial_state.rehydrate();
+
+        initial_state
     }
 
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
@@ -234,47 +403,7 @@ impl Component for Model {
 
                 false
             }
-            Msg::Guess => {
-                if self.guesses[self.current_guess].len() != self.word_length {
-                    self.message = String::from("Liian vähän kirjaimia!");
-                    return true;
-                }
-
-                if !self.word_list.contains(&self.guesses[self.current_guess]) {
-                    self.is_unknown = true;
-                    return true;
-                }
-
-                self.is_unknown = false;
-                self.is_winner = self.guesses[self.current_guess] == self.word;
-
-                for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
-                    if self.word[index] == *character {
-                        self.correct_characters.insert((*character, index));
-                    }
-
-                    if self.word.contains(character) {
-                        self.present_characters.insert(*character);
-                    } else {
-                        self.absent_characters.insert(*character);
-                    }
-                }
-
-                if self.is_winner {
-                    self.is_guessing = false;
-                    self.streak += 1;
-                    self.message = format!("Löysit sanan! {}", SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap());
-                } else if self.current_guess == self.max_guesses - 1 {
-                    self.is_guessing = false;
-                    self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
-                    self.streak = 0;
-                } else {
-                    self.message = EMPTY.to_string();
-                    self.current_guess += 1;
-                }
-
-                true
-            }
+            Msg::Guess => self.handle_guess(),
             Msg::NewGame => {
                 self.word = self
                     .word_list
@@ -297,16 +426,18 @@ impl Component for Model {
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
 
+                let _result = self.persist_new_game();
+
                 true
             }
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
-
+                self.is_menu_visible = false;
                 true
             }
             Msg::ToggleMenu => {
                 self.is_menu_visible = !self.is_menu_visible;
-
+                self.is_help_visible = false;
                 true
             }
             Msg::ChangeWordLength(new_length) => {
@@ -315,6 +446,7 @@ impl Component for Model {
                 self.word_length = new_length;
                 self.word_list = parse_words(WORDS, self.word_length);
                 self.streak = 0;
+                self.is_menu_visible = false;
 
                 link.send_message(Msg::NewGame);
 

@@ -17,5 +17,6 @@ version = "0.3"
 features = [
     "KeyboardEvent",
     "Window",
-    "Document"
+    "Document",
+    "Storage"
 ]
