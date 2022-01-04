@@ -504,7 +504,7 @@ impl Component for Model {
                     <div class="message">
                         { &self.message }
                         <div class="message-small">{{
-                            let word = self.guesses[self.current_guess].iter().collect::<String>();
+                            let word = self.guesses[self.current_guess].iter().collect::<String>().to_lowercase();
                         
                             if self.is_unknown {
                                 html! {
@@ -604,10 +604,10 @@ impl Component for Model {
                                 <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
 
                                 <p>
-                                    {"Käytetyn sanalistan pohjalla on Kotimaisten kielten keskuksen (Kotus) julkaisemaa "}
+                                    {"Käytetyn sanalistan pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
                                     <a href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                                    {" lisensoitu nykysuomen sanalista, josta on poimittu ne viisikirjaimiset sanat, jotka eivät sisällä vieraskielisiä kirjaimia. "}
-                                    {"Sanalistaa on muokattu käyttäjien ehdotusten mukaan, ja voit jättää omat ehdotuksesi sanuihin "}
+                                    {" lisensoitu nykysuomen sanalista, josta on poimittu ne viisikirjaimiset sanat, jotka sisältävät vain kirjaimia A-Ö. "}
+                                    {"Sanalistaa muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuihin "}
                                     <a href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                                     {"."}
                                 </p>
