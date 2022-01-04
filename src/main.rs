@@ -1,9 +1,10 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::mem;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{window, Window};
-use yew::{classes, html, Component, Context, Html, KeyboardEvent};
+use web_sys::{window, Element, HtmlElement, Window};
+use yew::{classes, html, Component, Context, Html, KeyboardEvent, NodeRef};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const ALLOWED_KEYS: [char; 29] = [
@@ -36,6 +37,7 @@ enum Msg {
     Enter,
     Guess,
     NewGame,
+    NewGameTransition,
     ToggleHelp,
     ToggleMenu,
     ChangeWordLength(usize),
@@ -61,9 +63,11 @@ struct Model {
     absent_characters: HashSet<char>,
 
     guesses: Vec<Vec<char>>,
+    previous_guesses: Vec<Vec<char>>,
     current_guess: usize,
     streak: usize,
 
+    guesses_ref: NodeRef,
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
 }
 
@@ -257,9 +261,7 @@ impl Model {
 
             let guesses_item = local_storage.get_item("guesses")?;
             if let Some(guesses_str) = guesses_item {
-                let previous_guesses = guesses_str
-                    .split(',')
-                    .map(|guess| guess.chars().collect());
+                let previous_guesses = guesses_str.split(',').map(|guess| guess.chars().collect());
 
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
@@ -313,8 +315,10 @@ impl Component for Model {
             correct_characters: HashSet::new(),
             absent_characters: HashSet::new(),
             guesses,
+            previous_guesses: Vec::new(),
             current_guess: 0,
             streak: 0,
+            guesses_ref: NodeRef::default(),
             keyboard_listener: None,
         };
 
@@ -406,12 +410,52 @@ impl Component for Model {
                 false
             }
             Msg::Guess => self.handle_guess(),
+            Msg::NewGameTransition => {
+                // https://aerotwist.com/blog/flip-your-animations/
+                let el = self.guesses_ref.cast::<HtmlElement>().unwrap();
+
+                let first = el.get_bounding_client_rect();
+
+                let class_list = js_sys::Array::new();
+                class_list.set(0, "move-to-first-row".into());
+
+                el.class_list().add(&class_list).unwrap();
+
+                let last = el.get_bounding_client_rect();
+
+                let invert = first.top() - last.top();
+
+                el.style()
+                    .set_property("transform", &format!("translateY({}px)", invert))
+                    .unwrap();
+
+                let cb = Closure::wrap(Box::new(move || {
+                    let class_list = js_sys::Array::new();
+                    class_list.set(0, "animate-transition".into());
+
+                    el.class_list().add(&class_list).unwrap();
+
+                    el.style().set_property("transform", "").unwrap();
+                }) as Box<dyn FnMut()>);
+
+                window()
+                    .expect("window not available")
+                    .request_animation_frame(cb.as_ref().unchecked_ref())
+                    .expect("should register `requestAnimationFrame`");
+
+                // TODO: Maybe don't just leak this, keep in state?
+                cb.forget();
+
+                false
+            }
             Msg::NewGame => {
-                self.word = self
-                    .word_list
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone();
+                let previous_word = mem::replace(
+                    &mut self.word,
+                    self.word_list
+                        .choose(&mut rand::thread_rng())
+                        .unwrap()
+                        .clone(),
+                );
 
                 self.is_guessing = true;
                 self.is_winner = false;
@@ -419,16 +463,37 @@ impl Component for Model {
 
                 self.message = EMPTY.to_string();
 
-                self.current_guess = 0;
-                self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                    .take(self.max_guesses)
-                    .collect::<Vec<_>>();
+                self.previous_guesses = mem::replace(
+                    &mut self.guesses,
+                    std::iter::repeat(Vec::with_capacity(self.word_length))
+                        .take(self.max_guesses)
+                        .collect::<Vec<_>>(),
+                );
 
                 self.correct_characters = HashSet::new();
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
+                if previous_word.len() == self.word_length {
+                    self.guesses[0] = previous_word;
+                    self.current_guess = 1;
+
+                    for (index, character) in self.guesses[0].iter().enumerate() {
+                        if self.word[index] == *character {
+                            self.correct_characters.insert((*character, index));
+                        }
+                        if self.word.contains(character) {
+                            self.present_characters.insert(*character);
+                        } else {
+                            self.absent_characters.insert(*character);
+                        }
+                    }
+                } else {
+                    self.current_guess = 0;
+                }
 
                 let _result = self.persist_new_game();
+
+                ctx.link().send_message(Msg::NewGameTransition);
 
                 true
             }
@@ -443,14 +508,12 @@ impl Component for Model {
                 true
             }
             Msg::ChangeWordLength(new_length) => {
-                let link = ctx.link();
-
                 self.word_length = new_length;
                 self.word_list = parse_words(WORDS, self.word_length);
                 self.streak = 0;
                 self.is_menu_visible = false;
 
-                link.send_message(Msg::NewGame);
+                ctx.link().send_message(Msg::NewGame);
 
                 false
             }
@@ -473,28 +536,83 @@ impl Component for Model {
                     }
                     <nav onclick={link.callback(|_| Msg::ToggleMenu)} class="title-icon">{"≡"}</nav>
                 </header>
+                {
+                    html! {
+                        <div class={classes!("board-container", self.previous_guesses.is_empty().then(|| "hidden"))}>
+                            <div ref={self.guesses_ref.clone()} class={format!("board-{}", self.max_guesses)}>
+                                { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
+                                    let mappings = self.character_state_mappings(guess);
+
+                                    if guess_index == self.current_guess {
+                                        html! {
+                                            <div class={format!("row-{}", self.word_length)}>
+                                                {
+                                                    (0..self.word_length).map(|char_index| html! {
+                                                    <div class={classes!(
+                                                        "tile",
+                                                        if self.is_guessing {
+                                                            guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
+                                                        } else {
+                                                            mappings[char_index]
+                                                        },
+                                                        self.is_guessing.then(|| Some("current"))
+                                                    )}>
+                                                        { guess.get(char_index).unwrap_or(&' ') }
+                                                    </div>
+                                                }).collect::<Html>() }
+                                            </div>
+                                        }
+                                    } else {
+                                        html! {
+                                            <div class={format!("row-{}", self.word_length)}>
+                                                {(0..self.word_length).map(|char_index| html! {
+                                                    <div class={classes!("tile", mappings[char_index])}>
+                                                        { guess.get(char_index).unwrap_or(&' ') }
+                                                    </div>
+                                                }).collect::<Html>() }
+                                            </div>
+                                        }
+                                    }
+                                }).collect::<Html>() }
+                            </div>
+                        </div>
+                    }
+                }
+
                 <div class="board-container">
                     <div class={format!("board-{}", self.max_guesses)}>
                         { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
                             let mappings = self.character_state_mappings(guess);
 
-                            html! {
-                                <div class={format!("row-{}", self.word_length)}>
-                                    {
-                                        (0..self.word_length).map(|char_index| html! {
-                                        <div class={classes!(
-                                            "tile",
-                                            if self.is_guessing && guess_index == self.current_guess {
-                                                guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
-                                            } else {
-                                                mappings[char_index]
-                                            },
-                                            if self.is_guessing && guess_index == self.current_guess { Some("current") } else { None }
-                                        )}>
-                                            { guess.get(char_index).unwrap_or(&' ') }
-                                        </div>
-                                    }).collect::<Html>() }
-                                </div>
+                            if guess_index == self.current_guess {
+                                html! {
+                                    <div class={format!("row-{}", self.word_length)}>
+                                        {
+                                            (0..self.word_length).map(|char_index| html! {
+                                            <div class={classes!(
+                                                "tile",
+                                                if self.is_guessing {
+                                                    guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
+                                                } else {
+                                                    mappings[char_index]
+                                                },
+                                                self.is_guessing.then(|| Some("current"))
+                                            )}>
+                                                { guess.get(char_index).unwrap_or(&' ') }
+                                            </div>
+                                        }).collect::<Html>() }
+                                    </div>
+                                }
+                            } else {
+                                html! {
+                                    <div class={format!("row-{}", self.word_length)}>
+                                        {(0..self.word_length).map(|char_index| html! {
+                                            <div class={classes!("tile", mappings[char_index])}>
+                                                { guess.get(char_index).unwrap_or(&' ') }
+                                            </div>
+                                        }).collect::<Html>() }
+                                    </div>
+                                }
                             }
                         }).collect::<Html>() }
                     </div>
@@ -505,7 +623,6 @@ impl Component for Model {
                         { &self.message }
                         <div class="message-small">{{
                             let word = self.guesses[self.current_guess].iter().collect::<String>().to_lowercase();
-                        
                             if self.is_unknown {
                                 html! {
                                     <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, word)}

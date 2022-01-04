@@ -193,6 +193,27 @@ a {
     text-transform: uppercase;
 }
 
+.hidden {
+    display: none;
+}
+
+.move-to-first-row {
+    position: relative;
+    top: -337.5px;
+}
+
+@keyframes displaceGuess {
+    from { transform : translateY(337.5px) }
+    to   { transform : translateY(0px) }
+}
+
+.animate-transition {
+    animation-name: displaceGuess;
+    animation-duration: 0.5s;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+}
+
 @media (min-width:320px) and (max-width:374px) {
     .board-container {
         align-items: flex-start;
@@ -203,6 +224,15 @@ a {
     }
     .keyboard-button {
         margin-right: 4px;
+    }
+
+    .move-to-first-row {
+        top: -262.5px;
+    }
+    
+    @keyframes displaceGuess {
+        from { transform : translateY(262.5px) }
+        to   { transform : translateY(0px) }
     }
 }
 
