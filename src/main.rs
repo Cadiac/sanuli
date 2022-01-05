@@ -1,9 +1,9 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt;
 use std::mem;
 use std::str::FromStr;
-use std::fmt;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{window, Window};
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
@@ -36,7 +36,7 @@ fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
 #[derive(PartialEq)]
 enum GameMode {
     Classic,
-    Relay
+    Relay,
 }
 
 impl FromStr for GameMode {
@@ -44,9 +44,9 @@ impl FromStr for GameMode {
 
     fn from_str(input: &str) -> Result<GameMode, Self::Err> {
         match input {
-            "classic"  => Ok(GameMode::Classic),
-            "relay"  => Ok(GameMode::Relay),
-            _      => Err(()),
+            "classic" => Ok(GameMode::Classic),
+            "relay" => Ok(GameMode::Relay),
+            _ => Err(()),
         }
     }
 }
@@ -55,7 +55,7 @@ impl fmt::Display for GameMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             GameMode::Classic => write!(f, "classic"),
-            GameMode::Relay => write!(f, "relay")
+            GameMode::Relay => write!(f, "relay"),
         }
     }
 }
@@ -77,7 +77,7 @@ enum CharacterState {
     Correct,
     Present,
     Absent,
-    Unknown
+    Unknown,
 }
 
 struct Model {
@@ -115,31 +115,39 @@ struct Model {
 
 impl Model {
     fn map_guess_row(&self, guess: &[char]) -> Vec<Option<&'static str>> {
-        let mut mappings = vec![Some("absent"); self.word_length];
+        let mut mappings = vec![None; self.word_length];
 
         let mut correct_or_absent_counts: HashMap<char, usize> = HashMap::new();
-        
         // Collect the counts of correct and absent characters first, since they will be shown
         // always but present characters can be revealed as absent if the word doesn't contain enough of them
         for (index, character) in guess.iter().enumerate() {
             match self.known_information.get(&(*character, index)) {
                 Some(CharacterState::Correct) => {
-                    correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
-                },
+                    correct_or_absent_counts
+                        .entry(*character)
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
+                }
                 Some(CharacterState::Absent) => {
-                    correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
-                },
+                    correct_or_absent_counts
+                        .entry(*character)
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
+                }
                 _ => {}
             }
         }
 
         for (index, character) in guess.iter().enumerate() {
             match self.known_information.get(&(*character, index)) {
-                Some(CharacterState::Correct) => {                    
+                Some(CharacterState::Correct) => {
                     mappings[index] = Some("correct");
-                },
+                }
                 Some(CharacterState::Present) => {
-                    let seen = correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
+                    let seen = correct_or_absent_counts
+                        .entry(*character)
+                        .and_modify(|count| *count += 1)
+                        .or_insert(1);
 
                     let at_least = self.known_at_least_counts.get(character).unwrap();
 
@@ -148,13 +156,13 @@ impl Model {
                     } else {
                         mappings[index] = Some("absent");
                     }
-                },
+                }
                 Some(CharacterState::Absent) => {
                     mappings[index] = Some("absent");
-                },
+                }
                 Some(CharacterState::Unknown) => {
                     mappings[index] = None;
-                },
+                }
                 None => {
                     mappings[index] = None;
                 }
@@ -162,18 +170,6 @@ impl Model {
         }
 
         mappings
-    }
-
-    fn map_current_row(&self, character_and_index: &(char, usize)) -> Option<&'static str> {
-        if self.correct_characters.contains(&character_and_index.0) {
-            Some("correct")
-        } else if self.present_characters.contains(&character_and_index.0) {
-            Some("present")
-        } else if self.absent_characters.contains(&character_and_index.0) {
-            Some("absent")
-        } else {
-            None
-        }
     }
 
     fn map_keyboard_state(&self, character: &char) -> Option<&'static str> {
@@ -188,9 +184,12 @@ impl Model {
         }
     }
 
-    fn analyze_guess(&mut self, guess: &[char]) {
+    fn reveal_guess(&mut self, guess: &[char]) {
         for (index, character) in guess.iter().enumerate() {
-            let known = self.known_information.entry((*character, index)).or_insert(CharacterState::Unknown);
+            let known = self
+                .known_information
+                .entry((*character, index))
+                .or_insert(CharacterState::Unknown);
 
             // Correct and absent are final and never change
             if self.word[index] == *character {
@@ -220,45 +219,6 @@ impl Model {
                 self.present_characters.insert(*character);
             }
         }
-    }
-
-    fn handle_guess(&mut self) -> bool {
-        if self.guesses[self.current_guess].len() != self.word_length {
-            self.message = "Liian vähän kirjaimia!".to_owned();
-            return true;
-        }
-
-        if !self.word_list.contains(&self.guesses[self.current_guess]) {
-            self.is_unknown = true;
-            self.message = "Ei sanulistalla.".to_owned();
-            return true;
-        }
-
-        self.is_reset = false;
-        self.is_unknown = false;
-        self.is_winner = self.guesses[self.current_guess] == self.word;
-
-        self.analyze_guess(&self.guesses[self.current_guess].clone());
-
-        if self.is_winner {
-            self.is_guessing = false;
-            self.streak += 1;
-            self.message = format!(
-                "Löysit sanan! {}",
-                SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
-            );
-        } else if self.current_guess == self.max_guesses - 1 {
-            self.is_guessing = false;
-            self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
-            self.streak = 0;
-        } else {
-            self.message = EMPTY.to_string();
-            self.current_guess += 1;
-        }
-
-        let _result = self.persist_guess();
-
-        true
     }
 
     fn persist_guess(&mut self) -> Result<(), JsValue> {
@@ -387,7 +347,7 @@ impl Model {
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
 
-                    self.analyze_guess(&self.guesses[guess_index].clone());
+                    self.reveal_guess(&self.guesses[guess_index].clone());
                 }
             }
         }
@@ -527,7 +487,44 @@ impl Component for Model {
 
                 false
             }
-            Msg::Guess => self.handle_guess(),
+            Msg::Guess => {
+                if self.guesses[self.current_guess].len() != self.word_length {
+                    self.message = "Liian vähän kirjaimia!".to_owned();
+                    return true;
+                }
+        
+                if !self.word_list.contains(&self.guesses[self.current_guess]) {
+                    self.is_unknown = true;
+                    self.message = "Ei sanulistalla.".to_owned();
+                    return true;
+                }
+        
+                self.is_reset = false;
+                self.is_unknown = false;
+                self.is_winner = self.guesses[self.current_guess] == self.word;
+        
+                self.reveal_guess(&self.guesses[self.current_guess].clone());
+        
+                if self.is_winner {
+                    self.is_guessing = false;
+                    self.streak += 1;
+                    self.message = format!(
+                        "Löysit sanan! {}",
+                        SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
+                    );
+                } else if self.current_guess == self.max_guesses - 1 {
+                    self.is_guessing = false;
+                    self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
+                    self.streak = 0;
+                } else {
+                    self.message = EMPTY.to_string();
+                    self.current_guess += 1;
+                }
+        
+                let _result = self.persist_guess();
+        
+                true
+            },
             Msg::NewGame => {
                 let previous_word = mem::replace(
                     &mut self.word,
@@ -549,7 +546,10 @@ impl Component for Model {
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
 
-                if previous_word.len() == self.word_length && self.is_winner && self.game_mode == GameMode::Relay {
+                if previous_word.len() == self.word_length
+                    && self.is_winner
+                    && self.game_mode == GameMode::Relay
+                {
                     let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
                         .take(self.max_guesses - 1)
                         .collect::<Vec<_>>();
@@ -559,7 +559,7 @@ impl Component for Model {
 
                     self.current_guess = 1;
 
-                    self.analyze_guess(&self.guesses[0].clone());
+                    self.reveal_guess(&self.guesses[0].clone());
                 } else {
                     self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
                         .take(self.max_guesses)
@@ -651,41 +651,35 @@ impl Component for Model {
                     <div class={classes!(
                         self.is_reset.then(|| "slide-in"),
                         self.is_reset.then(|| format!("slide-in-{}", self.previous_guesses.len())),
-                        format!("board-{}", self.max_guesses))}>
-                        { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
-                            let mappings = self.map_guess_row(guess);
+                        format!("board-{}", self.max_guesses))}>{
+                            self.guesses.iter().enumerate().map(|(guess_index, guess)| {
+                                let mappings = self.map_guess_row(guess);
 
-                            if guess_index == self.current_guess {
-                                html! {
-                                    <div class={format!("row-{}", self.word_length)}>
-                                        {
-                                            (0..self.word_length).map(|char_index| html! {
-                                            <div class={classes!(
-                                                "tile",
-                                                if self.is_guessing {
-                                                    guess.get(char_index).and_then(|c| self.map_current_row(&(*c, char_index)))
-                                                } else {
-                                                    mappings[char_index]
-                                                },
-                                                self.is_guessing.then(|| Some("current"))
-                                            )}>
-                                                { guess.get(char_index).unwrap_or(&' ') }
-                                            </div>
-                                        }).collect::<Html>() }
-                                    </div>
+                                if guess_index == self.current_guess {
+                                    html! {
+                                        <div class={format!("row-{}", self.word_length)}>
+                                            {
+                                                (0..self.word_length).map(|char_index| html! {
+                                                    <div class={classes!("tile", mappings[char_index], self.is_guessing.then(|| Some("current")))}>
+                                                        { guess.get(char_index).unwrap_or(&' ') }
+                                                    </div>
+                                                }).collect::<Html>()
+                                            }
+                                        </div>
+                                    }
+                                } else {
+                                    html! {
+                                        <div class={format!("row-{}", self.word_length)}>
+                                            {(0..self.word_length).map(|char_index| html! {
+                                                <div class={classes!("tile", mappings[char_index])}>
+                                                    { guess.get(char_index).unwrap_or(&' ') }
+                                                </div>
+                                            }).collect::<Html>() }
+                                        </div>
+                                    }
                                 }
-                            } else {
-                                html! {
-                                    <div class={format!("row-{}", self.word_length)}>
-                                        {(0..self.word_length).map(|char_index| html! {
-                                            <div class={classes!("tile", mappings[char_index])}>
-                                                { guess.get(char_index).unwrap_or(&' ') }
-                                            </div>
-                                        }).collect::<Html>() }
-                                    </div>
-                                }
-                            }
-                        }).collect::<Html>() }
+                            }).collect::<Html>()
+                        }
                     </div>
                 </div>
 
