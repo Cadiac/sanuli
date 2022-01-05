@@ -488,7 +488,7 @@ impl Component for Model {
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
 
-                if previous_word.len() == self.word_length && self.is_winner && self.game_mode == GameMode::Classic {
+                if previous_word.len() == self.word_length && self.is_winner && self.game_mode == GameMode::Relay {
                     let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
                         .take(self.max_guesses - 1)
                         .collect::<Vec<_>>();
