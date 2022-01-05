@@ -72,6 +72,14 @@ enum Msg {
     ChangeWordLength(usize),
 }
 
+#[derive(PartialEq)]
+enum CharacterState {
+    Correct,
+    Present,
+    Absent,
+    Unknown
+}
+
 struct Model {
     word_list: Vec<Vec<char>>,
     word: Vec<char>,
@@ -90,8 +98,11 @@ struct Model {
 
     message: String,
 
+    known_information: HashMap<(char, usize), CharacterState>,
+    known_at_least_counts: HashMap<char, usize>,
+
     present_characters: HashSet<char>,
-    correct_characters: HashSet<(char, usize)>,
+    correct_characters: HashSet<char>,
     absent_characters: HashSet<char>,
 
     guesses: Vec<Vec<char>>,
@@ -103,34 +114,49 @@ struct Model {
 }
 
 impl Model {
-    fn character_state_mappings(&self, guess: &[char]) -> Vec<Option<&'static str>> {
+    fn map_guess_row(&self, guess: &[char]) -> Vec<Option<&'static str>> {
         let mut mappings = vec![Some("absent"); self.word_length];
-        let mut correct_counts: HashMap<char, i32> = HashMap::new();
-        let mut present_counts: HashMap<char, i32> = HashMap::new();
 
+        let mut correct_or_absent_counts: HashMap<char, usize> = HashMap::new();
+        
+        // Collect the counts of correct and absent characters first, since they will be shown
+        // always but present characters can be revealed as absent if the word doesn't contain enough of them
         for (index, character) in guess.iter().enumerate() {
-            if self.correct_characters.contains(&(*character, index)) {
-                *correct_counts.entry(*character).or_insert(0) += 1;
-                mappings[index] = Some("correct");
+            match self.known_information.get(&(*character, index)) {
+                Some(CharacterState::Correct) => {
+                    correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
+                },
+                Some(CharacterState::Absent) => {
+                    correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
+                },
+                _ => {}
             }
         }
 
         for (index, character) in guess.iter().enumerate() {
-            if self.correct_characters.contains(&(*character, index)) {
-                continue;
-            }
-            if self.present_characters.contains(character) {
-                let correct_count = correct_counts.entry(*character).or_insert(0);
-                let present_count = present_counts.entry(*character).or_insert(0);
-                *present_count += 1;
+            match self.known_information.get(&(*character, index)) {
+                Some(CharacterState::Correct) => {                    
+                    mappings[index] = Some("correct");
+                },
+                Some(CharacterState::Present) => {
+                    let seen = correct_or_absent_counts.entry(*character).and_modify(|count| *count += 1).or_insert(1);
 
-                let character_present_in_word_count =
-                    self.word.iter().filter(|c| *c == character).count() as i32;
-                let is_found_all = *correct_count == character_present_in_word_count;
-                if !is_found_all
-                    && *present_count - *correct_count <= character_present_in_word_count
-                {
-                    mappings[index] = Some("present");
+                    let at_least = self.known_at_least_counts.get(character).unwrap();
+
+                    if *seen <= *at_least {
+                        mappings[index] = Some("present");
+                    } else {
+                        mappings[index] = Some("absent");
+                    }
+                },
+                Some(CharacterState::Absent) => {
+                    mappings[index] = Some("absent");
+                },
+                Some(CharacterState::Unknown) => {
+                    mappings[index] = None;
+                },
+                None => {
+                    mappings[index] = None;
                 }
             }
         }
@@ -138,15 +164,61 @@ impl Model {
         mappings
     }
 
-    fn map_keyboard_state(&self, character: &char) -> Option<&'static str> {
-        if self.correct_characters.iter().any(|(c, _)| c == character) {
+    fn map_current_row(&self, character_and_index: &(char, usize)) -> Option<&'static str> {
+        if self.correct_characters.contains(&character_and_index.0) {
             Some("correct")
-        } else if self.absent_characters.contains(character) {
-            Some("absent")
-        } else if self.present_characters.contains(character) {
+        } else if self.present_characters.contains(&character_and_index.0) {
             Some("present")
+        } else if self.absent_characters.contains(&character_and_index.0) {
+            Some("absent")
         } else {
             None
+        }
+    }
+
+    fn map_keyboard_state(&self, character: &char) -> Option<&'static str> {
+        if self.correct_characters.contains(character) {
+            Some("correct")
+        } else if self.present_characters.contains(character) {
+            Some("present")
+        } else if self.absent_characters.contains(character) {
+            Some("absent")
+        } else {
+            None
+        }
+    }
+
+    fn analyze_guess(&mut self, guess: &[char]) {
+        for (index, character) in guess.iter().enumerate() {
+            let known = self.known_information.entry((*character, index)).or_insert(CharacterState::Unknown);
+
+            // Correct and absent are final and never change
+            if self.word[index] == *character {
+                *known = CharacterState::Correct;
+
+                self.correct_characters.insert(*character);
+            } else if !self.word.contains(character) {
+                *known = CharacterState::Absent;
+
+                self.absent_characters.insert(*character);
+            } else {
+                // Character being present can reveal more information about the character amount
+                let count_in_word = self.word.iter().filter(|c| *c == character).count();
+                let count_in_guess = guess.iter().filter(|c| *c == character).count();
+
+                let at_least = self.known_at_least_counts.entry(*character).or_insert(0);
+                *known = CharacterState::Present;
+
+                if count_in_guess >= count_in_word {
+                    if count_in_word > *at_least {
+                        *at_least = count_in_word;
+                    }
+                } else if count_in_guess > *at_least {
+                    *at_least = count_in_guess;
+                }
+
+                self.present_characters.insert(*character);
+            }
         }
     }
 
@@ -166,17 +238,7 @@ impl Model {
         self.is_unknown = false;
         self.is_winner = self.guesses[self.current_guess] == self.word;
 
-        for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
-            if self.word[index] == *character {
-                self.correct_characters.insert((*character, index));
-            }
-
-            if self.word.contains(character) {
-                self.present_characters.insert(*character);
-            } else {
-                self.absent_characters.insert(*character);
-            }
-        }
+        self.analyze_guess(&self.guesses[self.current_guess].clone());
 
         if self.is_winner {
             self.is_guessing = false;
@@ -325,16 +387,7 @@ impl Model {
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
 
-                    for (index, character) in self.guesses[guess_index].iter().enumerate() {
-                        if self.word[index] == *character {
-                            self.correct_characters.insert((*character, index));
-                        }
-                        if self.word.contains(character) {
-                            self.present_characters.insert(*character);
-                        } else {
-                            self.absent_characters.insert(*character);
-                        }
-                    }
+                    self.analyze_guess(&self.guesses[guess_index].clone());
                 }
             }
         }
@@ -372,9 +425,14 @@ impl Component for Model {
             game_mode: GameMode::Classic,
 
             message: EMPTY.to_string(),
+
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
             absent_characters: HashSet::new(),
+
+            known_information: HashMap::new(),
+            known_at_least_counts: HashMap::new(),
+
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
@@ -498,16 +556,7 @@ impl Component for Model {
 
                     self.current_guess = 1;
 
-                    for (index, character) in self.guesses[0].iter().enumerate() {
-                        if self.word[index] == *character {
-                            self.correct_characters.insert((*character, index));
-                        }
-                        if self.word.contains(character) {
-                            self.present_characters.insert(*character);
-                        } else {
-                            self.absent_characters.insert(*character);
-                        }
-                    }
+                    self.analyze_guess(&self.guesses[0].clone());
                 } else {
                     self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
                         .take(self.max_guesses)
@@ -579,7 +628,7 @@ impl Component for Model {
                             html! {
                                 <div class={classes!("slide-out", format!("slide-out-{}", self.previous_guesses.len()), format!("board-{}", self.max_guesses))}>
                                     { self.previous_guesses.iter().map(|guess| {
-                                        let mappings = self.character_state_mappings(guess);
+                                        let mappings = self.map_guess_row(guess);
                                         html! {
                                             <div class={format!("row-{}", self.word_length)}>
                                                 {(0..self.word_length).map(|char_index| html! {
@@ -601,7 +650,7 @@ impl Component for Model {
                         self.is_reset.then(|| format!("slide-in-{}", self.previous_guesses.len())),
                         format!("board-{}", self.max_guesses))}>
                         { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
-                            let mappings = self.character_state_mappings(guess);
+                            let mappings = self.map_guess_row(guess);
 
                             if guess_index == self.current_guess {
                                 html! {
@@ -611,7 +660,7 @@ impl Component for Model {
                                             <div class={classes!(
                                                 "tile",
                                                 if self.is_guessing {
-                                                    guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
+                                                    guess.get(char_index).and_then(|c| self.map_current_row(&(*c, char_index)))
                                                 } else {
                                                     mappings[char_index]
                                                 },
