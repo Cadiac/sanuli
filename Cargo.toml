@@ -20,9 +20,5 @@ features = [
     "Window",
     "Document",
     "Storage",
-    "Element",
-    "HtmlElement",
-    "DomRect",
-    "DomTokenList",
-    "CssStyleDeclaration"
+    "Element"
 ]
