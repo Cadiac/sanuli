@@ -19,6 +19,5 @@ features = [
     "KeyboardEvent",
     "Window",
     "Document",
-    "Storage",
-    "Element"
+    "Storage"
 ]
