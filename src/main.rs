@@ -1,6 +1,9 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::mem;
+use std::str::FromStr;
+use std::fmt;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{window, Window};
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
@@ -30,6 +33,33 @@ fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
         .collect()
 }
 
+#[derive(PartialEq)]
+enum GameMode {
+    Classic,
+    Relay
+}
+
+impl FromStr for GameMode {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<GameMode, Self::Err> {
+        match input {
+            "classic"  => Ok(GameMode::Classic),
+            "relay"  => Ok(GameMode::Relay),
+            _      => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for GameMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GameMode::Classic => write!(f, "classic"),
+            GameMode::Relay => write!(f, "relay")
+        }
+    }
+}
+
 enum Msg {
     KeyPress(char),
     Backspace,
@@ -38,6 +68,7 @@ enum Msg {
     NewGame,
     ToggleHelp,
     ToggleMenu,
+    ChangeGameMode(GameMode),
     ChangeWordLength(usize),
 }
 
@@ -51,16 +82,20 @@ struct Model {
     is_guessing: bool,
     is_winner: bool,
     is_unknown: bool,
-    message: String,
-
+    is_reset: bool,
     is_help_visible: bool,
     is_menu_visible: bool,
+
+    game_mode: GameMode,
+
+    message: String,
 
     present_characters: HashSet<char>,
     correct_characters: HashSet<(char, usize)>,
     absent_characters: HashSet<char>,
 
     guesses: Vec<Vec<char>>,
+    previous_guesses: Vec<Vec<char>>,
     current_guess: usize,
     streak: usize,
 
@@ -127,6 +162,7 @@ impl Model {
             return true;
         }
 
+        self.is_reset = false;
         self.is_unknown = false;
         self.is_winner = self.guesses[self.current_guess] == self.word;
 
@@ -186,17 +222,37 @@ impl Model {
         Ok(())
     }
 
+    fn persist_settings(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("game_mode", &self.game_mode.to_string())?;
+            local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
+        }
+
+        Ok(())
+    }
+
     fn persist_new_game(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         let local_storage = window.local_storage().expect("local storage not available");
         if let Some(local_storage) = local_storage {
             local_storage.set_item("word", &self.word.iter().collect::<String>())?;
             local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
+            local_storage.set_item("current_guess", format!("{}", self.current_guess).as_str())?;
+            local_storage.set_item(
+                "guesses",
+                &self
+                    .guesses
+                    .iter()
+                    .map(|guess| guess.iter().collect::<String>())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            )?;
+
             local_storage.remove_item("is_guessing")?;
             local_storage.remove_item("is_winner")?;
             local_storage.remove_item("message")?;
-            local_storage.remove_item("current_guess")?;
-            local_storage.remove_item("guesses")?;
         }
 
         Ok(())
@@ -243,6 +299,13 @@ impl Model {
                 }
             }
 
+            let game_mode_item = local_storage.get_item("game_mode")?;
+            if let Some(game_mode_str) = game_mode_item {
+                if let Ok(game_mode) = game_mode_str.parse::<GameMode>() {
+                    self.game_mode = game_mode;
+                }
+            }
+
             let message_item = local_storage.get_item("message")?;
             if let Some(message_str) = message_item {
                 self.message = message_str;
@@ -257,9 +320,7 @@ impl Model {
 
             let guesses_item = local_storage.get_item("guesses")?;
             if let Some(guesses_str) = guesses_item {
-                let previous_guesses = guesses_str
-                    .split(',')
-                    .map(|guess| guess.chars().collect());
+                let previous_guesses = guesses_str.split(',').map(|guess| guess.chars().collect());
 
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
@@ -304,15 +365,18 @@ impl Component for Model {
             is_guessing: true,
             is_winner: false,
             is_unknown: false,
-
+            is_reset: false,
             is_menu_visible: false,
             is_help_visible: false,
+
+            game_mode: GameMode::Classic,
 
             message: EMPTY.to_string(),
             present_characters: HashSet::new(),
             correct_characters: HashSet::new(),
             absent_characters: HashSet::new(),
             guesses,
+            previous_guesses: Vec::new(),
             current_guess: 0,
             streak: 0,
             keyboard_listener: None,
@@ -407,26 +471,55 @@ impl Component for Model {
             }
             Msg::Guess => self.handle_guess(),
             Msg::NewGame => {
-                self.word = self
-                    .word_list
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone();
+                let previous_word = mem::replace(
+                    &mut self.word,
+                    self.word_list
+                        .choose(&mut rand::thread_rng())
+                        .unwrap()
+                        .clone(),
+                );
 
-                self.is_guessing = true;
-                self.is_winner = false;
-                self.is_unknown = false;
+                self.previous_guesses = mem::take(&mut self.guesses);
+                self.previous_guesses.truncate(self.current_guess);
 
-                self.message = EMPTY.to_string();
-
-                self.current_guess = 0;
-                self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                    .take(self.max_guesses)
-                    .collect::<Vec<_>>();
+                self.guesses = Vec::with_capacity(self.max_guesses);
 
                 self.correct_characters = HashSet::new();
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
+
+                if previous_word.len() == self.word_length && self.is_winner && self.game_mode == GameMode::Classic {
+                    let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                        .take(self.max_guesses - 1)
+                        .collect::<Vec<_>>();
+
+                    self.guesses.push(previous_word);
+                    self.guesses.extend(empty_guesses);
+
+                    self.current_guess = 1;
+
+                    for (index, character) in self.guesses[0].iter().enumerate() {
+                        if self.word[index] == *character {
+                            self.correct_characters.insert((*character, index));
+                        }
+                        if self.word.contains(character) {
+                            self.present_characters.insert(*character);
+                        } else {
+                            self.absent_characters.insert(*character);
+                        }
+                    }
+                } else {
+                    self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                        .take(self.max_guesses)
+                        .collect::<Vec<_>>();
+                    self.current_guess = 0;
+                }
+
+                self.is_guessing = true;
+                self.is_winner = false;
+                self.is_unknown = false;
+                self.is_reset = true;
+                self.message = EMPTY.to_string();
 
                 let _result = self.persist_new_game();
 
@@ -443,16 +536,22 @@ impl Component for Model {
                 true
             }
             Msg::ChangeWordLength(new_length) => {
-                let link = ctx.link();
-
                 self.word_length = new_length;
                 self.word_list = parse_words(WORDS, self.word_length);
                 self.streak = 0;
                 self.is_menu_visible = false;
 
-                link.send_message(Msg::NewGame);
+                ctx.link().send_message(Msg::NewGame);
 
-                false
+                true
+            }
+            Msg::ChangeGameMode(new_mode) => {
+                self.game_mode = new_mode;
+                self.is_menu_visible = false;
+
+                let _result = self.persist_settings();
+
+                true
             }
         }
     }
@@ -473,28 +572,66 @@ impl Component for Model {
                     }
                     <nav onclick={link.callback(|_| Msg::ToggleMenu)} class="title-icon">{"≡"}</nav>
                 </header>
+
                 <div class="board-container">
-                    <div class={format!("board-{}", self.max_guesses)}>
+                    {
+                        if !self.previous_guesses.is_empty() && self.is_reset {
+                            html! {
+                                <div class={classes!("slide-out", format!("slide-out-{}", self.previous_guesses.len()), format!("board-{}", self.max_guesses))}>
+                                    { self.previous_guesses.iter().map(|guess| {
+                                        let mappings = self.character_state_mappings(guess);
+                                        html! {
+                                            <div class={format!("row-{}", self.word_length)}>
+                                                {(0..self.word_length).map(|char_index| html! {
+                                                    <div class={classes!("tile", mappings[char_index])}>
+                                                        { guess.get(char_index).unwrap_or(&' ') }
+                                                    </div>
+                                                }).collect::<Html>() }
+                                            </div>
+                                        }
+                                    }).collect::<Html>() }
+                                </div>
+                            }
+                        } else {
+                            html! {}
+                        }
+                    }
+                    <div class={classes!(
+                        self.is_reset.then(|| "slide-in"),
+                        self.is_reset.then(|| format!("slide-in-{}", self.previous_guesses.len())),
+                        format!("board-{}", self.max_guesses))}>
                         { self.guesses.iter().enumerate().map(|(guess_index, guess)| {
                             let mappings = self.character_state_mappings(guess);
 
-                            html! {
-                                <div class={format!("row-{}", self.word_length)}>
-                                    {
-                                        (0..self.word_length).map(|char_index| html! {
-                                        <div class={classes!(
-                                            "tile",
-                                            if self.is_guessing && guess_index == self.current_guess {
-                                                guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
-                                            } else {
-                                                mappings[char_index]
-                                            },
-                                            if self.is_guessing && guess_index == self.current_guess { Some("current") } else { None }
-                                        )}>
-                                            { guess.get(char_index).unwrap_or(&' ') }
-                                        </div>
-                                    }).collect::<Html>() }
-                                </div>
+                            if guess_index == self.current_guess {
+                                html! {
+                                    <div class={format!("row-{}", self.word_length)}>
+                                        {
+                                            (0..self.word_length).map(|char_index| html! {
+                                            <div class={classes!(
+                                                "tile",
+                                                if self.is_guessing {
+                                                    guess.get(char_index).and_then(|c| self.map_keyboard_state(c))
+                                                } else {
+                                                    mappings[char_index]
+                                                },
+                                                self.is_guessing.then(|| Some("current"))
+                                            )}>
+                                                { guess.get(char_index).unwrap_or(&' ') }
+                                            </div>
+                                        }).collect::<Html>() }
+                                    </div>
+                                }
+                            } else {
+                                html! {
+                                    <div class={format!("row-{}", self.word_length)}>
+                                        {(0..self.word_length).map(|char_index| html! {
+                                            <div class={classes!("tile", mappings[char_index])}>
+                                                { guess.get(char_index).unwrap_or(&' ') }
+                                            </div>
+                                        }).collect::<Html>() }
+                                    </div>
+                                }
                             }
                         }).collect::<Html>() }
                     </div>
@@ -505,7 +642,6 @@ impl Component for Model {
                         { &self.message }
                         <div class="message-small">{{
                             let word = self.guesses[self.current_guess].iter().collect::<String>().to_lowercase();
-                        
                             if self.is_unknown {
                                 html! {
                                     <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, word)}
@@ -606,7 +742,7 @@ impl Component for Model {
                                 <p>
                                     {"Käytetyn sanalistan pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
                                     <a href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                                    {" lisensoitu nykysuomen sanalista, josta on poimittu ne viisikirjaimiset sanat, jotka sisältävät vain kirjaimia A-Ö. "}
+                                    {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. "}
                                     {"Sanalistaa muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuihin "}
                                     <a href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                                     {"."}
@@ -623,15 +759,28 @@ impl Component for Model {
                         html! {
                             <div class="modal">
                                 <span onclick={link.callback(|_| Msg::ToggleMenu)} class="modal-close">{"✖"}</span>
-                                <p class="title">{"Sanojen pituus:"}</p>
-                                <button class={classes!("select", (self.word_length == 5).then(|| Some("select-active")))}
-                                    onclick={link.callback(|_| Msg::ChangeWordLength(5))}>
-                                    {"5 merkkiä"}
-                                </button>
-                                <button class={classes!("select", (self.word_length == 6).then(|| Some("select-active")))}
-                                    onclick={link.callback(|_| Msg::ChangeWordLength(6))}>
-                                    {"6 merkkiä"}
-                                </button>
+                                <div>
+                                    <p class="title">{"Sanulien pituus:"}</p>
+                                    <button class={classes!("select", (self.word_length == 5).then(|| Some("select-active")))}
+                                        onclick={link.callback(|_| Msg::ChangeWordLength(5))}>
+                                        {"5 merkkiä"}
+                                    </button>
+                                    <button class={classes!("select", (self.word_length == 6).then(|| Some("select-active")))}
+                                        onclick={link.callback(|_| Msg::ChangeWordLength(6))}>
+                                        {"6 merkkiä"}
+                                    </button>
+                                </div>
+                                <div>
+                                    <p class="title">{"Vesiputousmoodi:"}</p>
+                                    <button class={classes!("select", (self.game_mode == GameMode::Classic).then(|| Some("select-active")))}
+                                        onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Classic))}>
+                                        {"Ei"}
+                                    </button>
+                                    <button class={classes!("select", (self.game_mode == GameMode::Relay).then(|| Some("select-active")))}
+                                        onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Relay))}>
+                                        {"Kyllä"}
+                                    </button>
+                                </div>
                             </div>
                         }
                     } else {

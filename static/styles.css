@@ -6,6 +6,12 @@
     --background: #121212;
     --text: #d7dadc;
     --white: #ffffff;
+    --slide-offset-1: 68.5px;
+    --slide-offset-2: 135.5px;
+    --slide-offset-3: 202.5px;
+    --slide-offset-4: 269.5px;
+    --slide-offset-5: 337.5px;
+
     font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -27,7 +33,7 @@ hr {
 
 .modal {
     position: fixed;
-    z-index: 1;
+    z-index: 3;
     flex-grow: 1;
     max-width: 390px;
     color: var(--white);
@@ -135,6 +141,7 @@ a {
 }
 
 .board-6 {
+    position: absolute;
     display: grid;
     grid-template-rows: repeat(6, 1fr);
     width: 350px;
@@ -145,6 +152,7 @@ a {
 }
 
 .keyboard {
+    z-index: 2;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -193,7 +201,173 @@ a {
     text-transform: uppercase;
 }
 
-@media (min-width:320px) and (max-width:374px) {
+@keyframes slideInAnimation-1 {
+    0% {
+        transform : translateY(var(--slide-offset-1));
+    }
+    100% {
+        transform : translateY(0px);
+     }
+}
+
+@keyframes slideOutAnimation-1 {
+    0% {
+        transform : translateY(var(--slide-offset-1));
+        opacity: 1;
+    }
+    100% {
+        transform : translateY(0px);
+        opacity: 0;
+     }
+}
+
+@keyframes slideInAnimation-2 {
+    0% {
+        transform : translateY(var(--slide-offset-2));
+    }
+    100% {
+        transform : translateY(0px);
+     }
+}
+
+@keyframes slideOutAnimation-2 {
+    0% {
+        transform : translateY(var(--slide-offset-2));
+        opacity: 1;
+    }
+    100% {
+        transform : translateY(0px);
+        opacity: 0;
+     }
+}
+
+@keyframes slideInAnimation-3 {
+    0% {
+        transform : translateY(var(--slide-offset-3));
+    }
+    100% {
+        transform : translateY(0px);
+     }
+}
+
+@keyframes slideOutAnimation-3 {
+    0% {
+        transform : translateY(var(--slide-offset-3));
+        opacity: 1;
+    }
+    100% {
+        transform : translateY(0px);
+        opacity: 0;
+     }
+}
+
+@keyframes slideInAnimation-4 {
+    0% {
+        transform : translateY(var(--slide-offset-4));
+    }
+    100% {
+        transform : translateY(0px);
+     }
+}
+
+@keyframes slideOutAnimation-4 {
+    0% {
+        transform : translateY(var(--slide-offset-4));
+        opacity: 1;
+    }
+    100% {
+        transform : translateY(0px);
+        opacity: 0;
+     }
+}
+
+@keyframes slideInAnimation-5 {
+    0% {
+        transform : translateY(var(--slide-offset-5));
+    }
+    100% {
+        transform : translateY(0px);
+     }
+}
+
+@keyframes slideOutAnimation-5 {
+    0% {
+        transform : translateY(var(--slide-offset-5));
+        opacity: 1;
+    }
+    100% {
+        transform : translateY(0px);
+        opacity: 0;
+     }
+}
+
+.fade-in {
+    animation-name: slideInAnimation-1;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: ease;
+    animation-duration: 1s;
+}
+
+.fade-out {
+    animation-name: slideOutAnimation-1;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: ease;
+    animation-duration: 1s;
+}
+
+.slide-out {
+    position: relative;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: ease;
+    animation-duration: 1s;
+}
+.slide-out-1 {
+    top: calc(-1 * var(--slide-offset-1));
+    animation-name: slideOutAnimation-1;
+}
+.slide-out-2 {
+    top: calc(-1 * var(--slide-offset-2));
+    animation-name: slideOutAnimation-2;
+}
+.slide-out-3 {
+    top: calc(-1 * var(--slide-offset-3));
+    animation-name: slideOutAnimation-3;
+}
+.slide-out-4 {
+    top: calc(-1 * var(--slide-offset-4));
+    animation-name: slideOutAnimation-4;
+}
+.slide-out-5 {
+    top: calc(-1 * var(--slide-offset-5));
+    animation-name: slideOutAnimation-5;
+}
+
+.slide-in {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: ease;
+    animation-duration: 1s;
+}
+.slide-in-1 {
+    animation-name: slideInAnimation-1;
+}
+.slide-in-2 {
+    animation-name: slideInAnimation-2;
+}
+.slide-in-3 {
+    animation-name: slideInAnimation-3;
+}
+.slide-in-4 {
+    animation-name: slideInAnimation-4;
+}
+.slide-in-5 {
+    animation-name: slideInAnimation-5;
+}
+
+@media (max-width:374px) {
     .board-container {
         align-items: flex-start;
     }
@@ -203,6 +377,13 @@ a {
     }
     .keyboard-button {
         margin-right: 4px;
+    }
+    :root {
+        --slide-offset-1: 52.5px;
+        --slide-offset-2: 105.5px;
+        --slide-offset-3: 158.5px;
+        --slide-offset-4: 211.5px;
+        --slide-offset-5: 264.5px;
     }
 }
 
@@ -269,6 +450,7 @@ a {
 
 .select {
     height: 50px;
+    min-width: 100px;
 
     background-color: var(--background);
     border: 2px solid var(--unknown);
@@ -282,6 +464,7 @@ a {
     padding: 0.5em 0.5em;
     margin-right: 6px;
     margin-top: 20px;
+    margin-bottom: 20px;
 
     text-transform: uppercase;
 }
