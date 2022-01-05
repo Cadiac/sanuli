@@ -542,6 +542,9 @@ impl Component for Model {
 
                 self.guesses = Vec::with_capacity(self.max_guesses);
 
+                self.known_information = HashMap::new();
+                self.known_at_least_counts = HashMap::new();
+
                 self.correct_characters = HashSet::new();
                 self.present_characters = HashSet::new();
                 self.absent_characters = HashSet::new();
