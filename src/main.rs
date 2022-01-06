@@ -110,6 +110,50 @@ struct Model {
 }
 
 impl Model {
+    fn new(word_length: usize, max_guesses: usize) -> Self {
+        let word_list = parse_words(WORDS, word_length);
+        let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        let guesses = std::iter::repeat(Vec::with_capacity(word_length))
+            .take(max_guesses)
+            .collect::<Vec<_>>();
+
+        let known_states = std::iter::repeat(HashMap::new())
+            .take(max_guesses)
+            .collect::<Vec<_>>();
+
+        let known_at_least_counts = std::iter::repeat(HashMap::new())
+            .take(max_guesses)
+            .collect::<Vec<_>>();
+
+        Self {
+            word,
+            word_list,
+
+            word_length,
+            max_guesses,
+
+            is_guessing: true,
+            is_winner: false,
+            is_unknown: false,
+            is_reset: false,
+            is_menu_visible: false,
+            is_help_visible: false,
+
+            game_mode: GameMode::Classic,
+
+            message: EMPTY.to_string(),
+
+            known_states,
+            known_at_least_counts,
+            discovered_characters: HashSet::new(),
+
+            guesses,
+            previous_guesses: Vec::new(),
+            current_guess: 0,
+            streak: 0,
+            keyboard_listener: None,
+        }
+    }
     fn map_guess_row(&self, guess: &[char], guess_round: usize) -> Vec<Option<&'static str>> {
         let mut mappings = vec![None; self.word_length];
 
@@ -163,11 +207,13 @@ impl Model {
             _ => {
                 let is_count_unknown = !self.known_at_least_counts[self.current_guess]
                     .contains_key(&character_and_index.0);
-    
-                let is_absent = is_count_unknown && self.known_states[self.current_guess]
-                    .iter()
-                    .any(|((c, _index), state)| c == &character_and_index.0 && state == &CharacterState::Absent);
 
+                let is_absent = is_count_unknown
+                    && self.known_states[self.current_guess]
+                        .iter()
+                        .any(|((c, _index), state)| {
+                            c == &character_and_index.0 && state == &CharacterState::Absent
+                        });
                 if is_absent {
                     return Some("absent");
                 }
@@ -183,17 +229,17 @@ impl Model {
         let is_correct = self.known_states[self.current_guess]
             .iter()
             .any(|((c, _index), state)| c == character && state == &CharacterState::Correct);
-        
         if is_correct {
             return Some("correct");
         }
 
-        let is_count_unknown = !self.known_at_least_counts[self.current_guess]
-            .contains_key(character);
+        let is_count_unknown =
+            !self.known_at_least_counts[self.current_guess].contains_key(character);
 
-        let is_absent = is_count_unknown && self.known_states[self.current_guess]
-            .iter()
-            .any(|((c, _index), state)| c == character && state == &CharacterState::Absent);
+        let is_absent = is_count_unknown
+            && self.known_states[self.current_guess]
+                .iter()
+                .any(|((c, _index), state)| c == character && state == &CharacterState::Absent);
 
         if is_absent {
             Some("absent")
@@ -219,14 +265,12 @@ impl Model {
                     let at_least = self.known_at_least_counts[self.current_guess]
                         .entry(*character)
                         .or_insert(0);
-    
                     // At least the same amount of characters as in the word are highlighted
                     let count_in_word = self.word.iter().filter(|c| *c == character).count();
                     let count_in_guess = self.guesses[self.current_guess]
                         .iter()
                         .filter(|c| *c == character)
                         .count();
-    
                     if count_in_guess >= count_in_word {
                         if count_in_word > *at_least {
                             *at_least = count_in_word;
@@ -389,50 +433,11 @@ impl Component for Model {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let word_list = parse_words(WORDS, DEFAULT_WORD_LENGTH);
-        let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
-        let guesses = std::iter::repeat(Vec::with_capacity(DEFAULT_WORD_LENGTH))
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        let known_states = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        let known_at_least_counts = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        let mut initial_state = Self {
-            word,
-            word_list,
-
-            word_length: DEFAULT_WORD_LENGTH,
-            max_guesses: DEFAULT_MAX_GUESSES,
-
-            is_guessing: true,
-            is_winner: false,
-            is_unknown: false,
-            is_reset: false,
-            is_menu_visible: false,
-            is_help_visible: false,
-
-            game_mode: GameMode::Classic,
-
-            message: EMPTY.to_string(),
-
-            known_states,
-            known_at_least_counts,
-            discovered_characters: HashSet::new(),
-
-            guesses,
-            previous_guesses: Vec::new(),
-            current_guess: 0,
-            streak: 0,
-            keyboard_listener: None,
-        };
-
-        let _result = initial_state.rehydrate();
+        let mut initial_state = Self::new(DEFAULT_WORD_LENGTH, DEFAULT_MAX_GUESSES);
+        if initial_state.rehydrate().is_err() {
+            // Reinitialize and just continue with defaults
+            initial_state = Self::new(DEFAULT_WORD_LENGTH, DEFAULT_MAX_GUESSES);
+        }
 
         initial_state
     }
