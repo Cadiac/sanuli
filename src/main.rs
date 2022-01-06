@@ -16,6 +16,7 @@ const ALLOWED_KEYS: [char; 29] = [
 const EMPTY: char = '\u{00a0}'; // &nbsp;
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 const FORMS_LINK_TEMPLATE_DEL: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Poistoa&entry.560255602=";
+const DICTIONARY_LINK_TEMPLATE: &str = "https://www.kielitoimistonsanakirja.fi/#/";
 const DEFAULT_WORD_LENGTH: usize = 5;
 const DEFAULT_MAX_GUESSES: usize = 6;
 
@@ -726,18 +727,25 @@ impl Component for Model {
                     <div class="message">
                         { &self.message }
                         <div class="message-small">{{
-                            let word = self.guesses[self.current_guess].iter().collect::<String>().to_lowercase();
                             if self.is_unknown {
+                                let last_guess = self.guesses[self.current_guess].iter().collect::<String>().to_lowercase();
                                 html! {
-                                    <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, word)}
+                                    <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, last_guess)}
                                         target="_blank">{ "Ehdota lisäystä?" }
                                     </a>
                                 }
                             } else if !self.is_winner & !self.is_guessing {
+                                let word = self.word.iter().collect::<String>().to_lowercase();
                                 html! {
-                                    <a href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
-                                        target="_blank">{ "Ehdota poistoa?" }
-                                    </a>
+                                    <>
+                                        <a href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
+                                            target="_blank">{ "Sanakirja" }
+                                        </a>
+                                        {" | "}
+                                        <a href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
+                                            target="_blank">{ "Ehdota poistoa?" }
+                                        </a>
+                                    </>
                                 }
                             } else {
                                 html! {}
