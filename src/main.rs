@@ -394,10 +394,10 @@ impl Component for App {
                                             onmousedown={link.callback(|_| Msg::ChangeGameMode(GameMode::Relay))}>
                                             {"Sanuliketju"}
                                         </button>
-                                        // <button class={classes!("select", (self.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
-                                        //     onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::DailyWord))}>
-                                        //     {"Päivän sanuli"}
-                                        // </button>
+                                        <button class={classes!("select", (self.state.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::DailyWord))}>
+                                            {"Päivän sanuli"}
+                                        </button>
                                     </div>
                                 </div>
                             </div>

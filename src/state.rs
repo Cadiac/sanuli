@@ -396,7 +396,7 @@ impl State {
             self.word_list = parse_words(WORDS, self.word_length);
         }
 
-        let today = Local::now().naive_utc().date();
+        let today = Local::now().naive_local().date();
         if let Some(solve) = self.daily_word_history.get(&today).cloned() {
             for (guess_index, guess) in solve.guesses.iter().enumerate() {
                 self.guesses[guess_index] = guess.clone();
@@ -711,7 +711,7 @@ impl State {
         }
 
         if self.game_mode == GameMode::DailyWord {
-            let today = Local::now().naive_utc().date();
+            let today = Local::now().naive_local().date();
             self.set_daily_word_history(&today);
 
             let _result = self.persist_single_daily_word(&today);
@@ -781,7 +781,7 @@ impl State {
         self.clear_message();
 
         if self.game_mode == GameMode::DailyWord {
-            let today = Local::now().naive_utc().date();
+            let today = Local::now().naive_local().date();
             if let Some(solve) = self.daily_word_history.get(&today).cloned() {
                 for (guess_index, guess) in solve.guesses.iter().enumerate() {
                     self.guesses[guess_index] = guess.clone();
