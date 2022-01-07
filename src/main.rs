@@ -8,8 +8,7 @@ use std::str::FromStr;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{window, Window};
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
-
-use chrono::{Date, DateTime, Duration, Local, NaiveDateTime, TimeZone, Timelike, Utc, NaiveDate};
+use chrono::{Local, NaiveDate};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
@@ -95,7 +94,7 @@ struct DailyWordHistory {
     guesses: Vec<Vec<char>>,
     current_guess: usize,
     is_guessing: bool,
-    is_winner: bool
+    is_winner: bool,
 }
 
 struct Model {
@@ -179,7 +178,6 @@ impl Model {
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
-            
             streak: 0,
             max_streak: 0,
             total_played: 0,
@@ -405,7 +403,8 @@ impl Model {
                 "daily_word_history",
                 &format!(
                     "{}",
-                    &self.daily_word_history
+                    &self
+                        .daily_word_history
                         .keys()
                         .map(|date| date.format("%Y-%m-%d").to_string())
                         .collect::<Vec<_>>()
@@ -446,7 +445,7 @@ impl Model {
         }
     }
 
-    fn rehydrate_game(&mut self) -> Result<(), JsValue>{
+    fn rehydrate_game(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage().expect("local storage not available") {
             let word_length_item = local_storage.get_item("word_length")?;
@@ -515,11 +514,11 @@ impl Model {
             let daily_word_history_item = local_storage.get_item("daily_word_history")?;
             if let Some(daily_word_history_str) = daily_word_history_item {
                 if daily_word_history_str.len() != 0 {
-                    daily_word_history_str
-                    .split(',')
-                    .for_each(|date_str| {
+                    daily_word_history_str.split(',').for_each(|date_str| {
                         let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
-                        let daily_item = local_storage.get_item(&format!("daily_word_history[{}]", date_str)).unwrap();
+                        let daily_item = local_storage
+                            .get_item(&format!("daily_word_history[{}]", date_str))
+                            .unwrap();
                         if let Some(daily_str) = daily_item {
                             let parts = daily_str.split('|').collect::<Vec<&str>>();
 
@@ -605,13 +604,19 @@ impl Model {
 
     fn get_daily_word_index(&self) -> usize {
         let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        let days = NaiveDate::signed_duration_since(epoch, Local::now().naive_local().date()).num_days();
+        let days =
+            NaiveDate::signed_duration_since(epoch, Local::now().naive_local().date()).num_days();
 
         days as usize
     }
 
     fn get_daily_word(&self) -> Vec<char> {
-        DAILY_WORDS.lines().nth(self.get_daily_word_index()).unwrap().chars().collect()
+        DAILY_WORDS
+            .lines()
+            .nth(self.get_daily_word_index())
+            .unwrap()
+            .chars()
+            .collect()
     }
 }
 
@@ -704,7 +709,11 @@ impl Component for Model {
                 let link = ctx.link();
 
                 if !self.is_guessing {
-                    link.send_message(Msg::NewGame);
+                    if self.game_mode == GameMode::DailyWord {
+                        link.send_message(Msg::ChangePreviousGameMode);
+                    } else {
+                        link.send_message(Msg::NewGame);
+                    }
                 } else {
                     link.send_message(Msg::Guess);
                 }
@@ -727,7 +736,6 @@ impl Component for Model {
                 self.reveal_current_guess();
 
                 let is_game_ended = self.is_winner || self.current_guess == self.max_guesses - 1;
-                
                 if self.game_mode == GameMode::DailyWord {
                     let today = Local::now().naive_utc().date();
 
@@ -807,8 +815,16 @@ impl Component for Model {
 
                 let previous_word = mem::replace(&mut self.word, next_word);
 
-                self.previous_guesses = mem::take(&mut self.guesses);
-                self.previous_guesses.truncate(self.current_guess);
+                if previous_word.len() <= self.word_length {
+                    self.previous_guesses = mem::take(&mut self.guesses);
+                    self.previous_guesses.truncate(self.current_guess);
+                } else {
+                    let previous_guesses = mem::take(&mut self.guesses);
+                    self.previous_guesses = previous_guesses.into_iter()
+                        .map(|guess| guess.into_iter().take(self.word_length).collect())
+                        .collect();
+                    self.previous_guesses.truncate(self.current_guess);
+                }
 
                 self.guesses = Vec::with_capacity(self.max_guesses);
 
@@ -885,6 +901,10 @@ impl Component for Model {
                 self.streak = 0;
                 self.is_menu_visible = false;
 
+                if self.game_mode == GameMode::DailyWord {
+                    self.game_mode = GameMode::Classic;
+                }
+
                 ctx.link().send_message(Msg::NewGame);
 
                 true
@@ -895,12 +915,18 @@ impl Component for Model {
                 self.message = EMPTY.to_string();
                 let _result = self.persist_settings();
 
+                if self.game_mode == GameMode::DailyWord {
+                    self.word_list = parse_words(WORDS, 5);
+                    self.word_length = 5;
+                }
+
                 ctx.link().send_message(Msg::NewGame);
 
                 true
             }
             Msg::ChangePreviousGameMode => {
-                ctx.link().send_message(Msg::ChangeGameMode(self.previous_game_mode.clone()));
+                ctx.link()
+                    .send_message(Msg::ChangeGameMode(self.previous_game_mode.clone()));
 
                 true
             }
@@ -1129,29 +1155,33 @@ impl Component for Model {
                                 <span onclick={link.callback(|_| Msg::ToggleMenu)} class="modal-close">{"✖"}</span>
                                 <div>
                                     <p class="title">{"Sanulien pituus:"}</p>
-                                    <button class={classes!("select", (self.word_length == 5).then(|| Some("select-active")))}
-                                        onclick={link.callback(|_| Msg::ChangeWordLength(5))}>
-                                        {"5 merkkiä"}
-                                    </button>
-                                    <button class={classes!("select", (self.word_length == 6).then(|| Some("select-active")))}
-                                        onclick={link.callback(|_| Msg::ChangeWordLength(6))}>
-                                        {"6 merkkiä"}
-                                    </button>
+                                    <div class="select-container">
+                                        <button class={classes!("select", (self.word_length == 5).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeWordLength(5))}>
+                                            {"5 merkkiä"}
+                                        </button>
+                                        <button class={classes!("select", (self.word_length == 6).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeWordLength(6))}>
+                                            {"6 merkkiä"}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <p class="title">{"Pelimuoto:"}</p>
-                                    <button class={classes!("select", (self.game_mode == GameMode::Classic).then(|| Some("select-active")))}
-                                        onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Classic))}>
-                                        {"Peruspeli"}
-                                    </button>
-                                    <button class={classes!("select", (self.game_mode == GameMode::Relay).then(|| Some("select-active")))}
-                                        onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Relay))}>
-                                        {"Sanuliketju"}
-                                    </button>
-                                    <button class={classes!("select", (self.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
-                                        onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::DailyWord))}>
-                                        {"Päivän sanuli"}
-                                    </button>
+                                    <div class="select-container">
+                                        <button class={classes!("select", (self.game_mode == GameMode::Classic).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Classic))}>
+                                            {"Peruspeli"}
+                                        </button>
+                                        <button class={classes!("select", (self.game_mode == GameMode::Relay).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::Relay))}>
+                                            {"Sanuliketju"}
+                                        </button>
+                                        <button class={classes!("select", (self.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
+                                            onclick={link.callback(|_| Msg::ChangeGameMode(GameMode::DailyWord))}>
+                                            {"Päivän sanuli"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         }
