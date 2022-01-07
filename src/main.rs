@@ -126,7 +126,11 @@ struct Model {
     guesses: Vec<Vec<char>>,
     previous_guesses: Vec<Vec<char>>,
     current_guess: usize,
+
     streak: usize,
+    max_streak: usize,
+    total_played: usize,
+    total_solved: usize,
 
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
 }
@@ -175,7 +179,12 @@ impl Model {
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
+            
             streak: 0,
+            max_streak: 0,
+            total_played: 0,
+            total_solved: 0,
+
             keyboard_listener: None,
         }
     }
@@ -330,11 +339,23 @@ impl Model {
         Ok(())
     }
 
+    fn persist_stats(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("streak", &format!("{}", self.streak))?;
+            local_storage.set_item("max_streak", &format!("{}", self.max_streak))?;
+            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
+            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
+        }
+
+        Ok(())
+    }
+
     fn persist_game(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         let local_storage = window.local_storage().expect("local storage not available");
         if let Some(local_storage) = local_storage {
-            local_storage.set_item("streak", format!("{}", self.streak).as_str())?;
             local_storage.set_item("word", &self.word.iter().collect::<String>())?;
             local_storage.set_item("word_length", &format!("{}", self.word_length))?;
             local_storage.set_item("current_guess", &format!("{}", self.current_guess))?;
@@ -389,8 +410,11 @@ impl Model {
                         .map(|date| date.format("%Y-%m-%d").to_string())
                         .collect::<Vec<_>>()
                         .join(",")
-                ), 
+                ),
             )?;
+
+            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
+            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
         }
 
         Ok(())
@@ -524,6 +548,12 @@ impl Model {
                 }
             }
 
+            let message_item = local_storage.get_item("message")?;
+            if let Some(message_str) = message_item {
+                self.message = message_str;
+            }
+
+            // Stats
             let streak_item = local_storage.get_item("streak")?;
             if let Some(streak_str) = streak_item {
                 if let Ok(streak) = streak_str.parse::<usize>() {
@@ -531,9 +561,25 @@ impl Model {
                 }
             }
 
-            let message_item = local_storage.get_item("message")?;
-            if let Some(message_str) = message_item {
-                self.message = message_str;
+            let max_streak_item = local_storage.get_item("max_streak")?;
+            if let Some(max_streak_str) = max_streak_item {
+                if let Ok(max_streak) = max_streak_str.parse::<usize>() {
+                    self.max_streak = max_streak;
+                }
+            }
+
+            let total_played_item = local_storage.get_item("total_played")?;
+            if let Some(total_played_str) = total_played_item {
+                if let Ok(total_played) = total_played_str.parse::<usize>() {
+                    self.total_played = total_played;
+                }
+            }
+
+            let total_solved_item = local_storage.get_item("total_solved")?;
+            if let Some(total_solved_str) = total_solved_item {
+                if let Ok(total_solved) = total_solved_str.parse::<usize>() {
+                    self.total_solved = total_solved;
+                }
             }
 
             // Gamemode specific
@@ -687,9 +733,10 @@ impl Component for Model {
 
                     if is_game_ended {
                         self.is_guessing = false;
+                        self.total_played += 1;
 
                         if self.is_winner {
-                            self.streak += 1;
+                            self.total_solved += 1;
                             self.message = format!(
                                 "Löysit päivän sanulin! {}",
                                 SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
@@ -697,8 +744,9 @@ impl Component for Model {
                         } else {
                             self.message =
                                 format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
-                            self.streak = 0;
                         }
+
+                        let _result = self.persist_stats();
                     } else {
                         self.message = EMPTY.to_string();
                         self.current_guess += 1;
@@ -720,9 +768,15 @@ impl Component for Model {
                 } else {
                     if is_game_ended {
                         self.is_guessing = false;
+                        self.total_played += 1;
 
                         if self.is_winner {
+                            self.total_solved += 1;
                             self.streak += 1;
+                            if self.streak > self.max_streak {
+                                self.max_streak = self.streak;
+                            }
+
                             self.message = format!(
                                 "Löysit sanan! {}",
                                 SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
@@ -732,6 +786,8 @@ impl Component for Model {
                                 format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
                             self.streak = 0;
                         }
+
+                        let _result = self.persist_stats();
                     } else {
                         self.message = EMPTY.to_string();
                         self.current_guess += 1;
