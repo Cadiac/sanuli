@@ -137,10 +137,14 @@ impl Component for App {
             }
             Msg::ChangeWordLength(new_length) => {
                 self.state.change_word_length(new_length);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
                 self.state.create_new_game()
             }
             Msg::ChangeGameMode(new_mode) => {
                 self.state.change_game_mode(new_mode);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
                 self.state.create_new_game()
             }
             Msg::ChangePreviousGameMode => {
