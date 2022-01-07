@@ -50,8 +50,8 @@ hr {
     position: absolute;
     top: 0;
     right: 0;
-    padding: 0;
-    margin: 12px;
+    padding: 12px;
+    margin: 0px;
     border: none;
     background: none;
     cursor: pointer;
@@ -73,7 +73,7 @@ header {
 }
 
 .title-icon {
-    margin: 6px 12px 0px 12px;
+    padding: 6px 12px 0px 12px;
     color: var(--text);
     font-weight: 700;
     font-size: 16px;
@@ -448,9 +448,17 @@ a {
     border: 5px solid var(--correct);
 }
 
+.select-container {
+    margin-top: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
 .select {
     height: 50px;
-    min-width: 100px;
+    min-width: 80px;
+    flex-grow: 1;
 
     background-color: var(--background);
     border: 2px solid var(--unknown);
@@ -462,9 +470,7 @@ a {
 
     font-weight: bold;
     padding: 0.5em 0.5em;
-    margin-right: 6px;
-    margin-top: 20px;
-    margin-bottom: 20px;
+    margin: 3px;
 
     text-transform: uppercase;
 }
