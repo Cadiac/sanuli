@@ -86,6 +86,18 @@ header {
     margin-top: 6px;
     margin-bottom: 0px;
     color: var(--text);
+    z-index: 2;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.2rem;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.label {
+    margin-top: 6px;
+    margin-bottom: 0px;
+    color: var(--text);
     font-weight: 700;
     font-size: 16px;
     letter-spacing: 0.2rem;
@@ -101,6 +113,7 @@ a {
     color: var(--text);
     margin-top: 0px;
     margin-bottom: 0px;
+    text-shadow: 2px 2px 10px #000000;
     min-height: 39px;
     font-weight: 700;
     font-size: 14px;
@@ -367,7 +380,7 @@ a {
     animation-name: slideInAnimation-5;
 }
 
-@media (max-width:374px) {
+@media (max-width:375px) {
     .board-container {
         align-items: flex-start;
     }
@@ -384,6 +397,12 @@ a {
         --slide-offset-3: 158.5px;
         --slide-offset-4: 211.5px;
         --slide-offset-5: 264.5px;
+    }
+}
+
+@media (max-height:700px) {
+    .board-container {
+        align-items: flex-start;
     }
 }
 

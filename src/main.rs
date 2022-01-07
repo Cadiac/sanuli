@@ -371,7 +371,7 @@ impl Component for App {
                             <div class="modal">
                                 <span onmousedown={link.callback(|_| Msg::ToggleMenu)} class="modal-close">{"✖"}</span>
                                 <div>
-                                    <p class="title">{"Sanulien pituus:"}</p>
+                                    <label class="label">{"Sanulien pituus:"}</label>
                                     <div class="select-container">
                                         <button class={classes!("select", (self.state.word_length == 5).then(|| Some("select-active")))}
                                             onmousedown={link.callback(|_| Msg::ChangeWordLength(5))}>
@@ -384,7 +384,7 @@ impl Component for App {
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="title">{"Pelimuoto:"}</p>
+                                    <label class="label">{"Pelimuoto:"}</label>
                                     <div class="select-container">
                                         <button class={classes!("select", (self.state.game_mode == GameMode::Classic).then(|| Some("select-active")))}
                                             onmousedown={link.callback(|_| Msg::ChangeGameMode(GameMode::Classic))}>
