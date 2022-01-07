@@ -5,10 +5,10 @@ use std::fmt;
 use std::mem;
 use std::str::FromStr;
 
+use chrono::{Local, NaiveDate};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{window, Window};
 use yew::{classes, html, Component, Context, Html, KeyboardEvent};
-use chrono::{Local, NaiveDate};
 
 const WORDS: &str = include_str!("../word-list.txt");
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
@@ -604,10 +604,11 @@ impl Model {
 
     fn get_daily_word_index(&self) -> usize {
         let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        let days =
-            NaiveDate::signed_duration_since(epoch, Local::now().naive_local().date()).num_days();
-
-        days as usize
+        Local::now()
+            .naive_local()
+            .date()
+            .signed_duration_since(epoch)
+            .num_days() as usize
     }
 
     fn get_daily_word(&self) -> Vec<char> {
@@ -820,7 +821,8 @@ impl Component for Model {
                     self.previous_guesses.truncate(self.current_guess);
                 } else {
                     let previous_guesses = mem::take(&mut self.guesses);
-                    self.previous_guesses = previous_guesses.into_iter()
+                    self.previous_guesses = previous_guesses
+                        .into_iter()
                         .map(|guess| guess.into_iter().take(self.word_length).collect())
                         .collect();
                     self.previous_guesses.truncate(self.current_guess);
