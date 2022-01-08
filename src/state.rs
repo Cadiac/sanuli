@@ -16,6 +16,11 @@ const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 
+const ALLOWED_KEYS: [char; 29] = [
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
+    'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
+];
+
 fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
     words
         .lines()
@@ -24,7 +29,7 @@ fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
         .collect()
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum GameMode {
     Classic,
     Relay,
@@ -59,6 +64,25 @@ pub enum CharacterState {
     Correct,
     Absent,
     Unknown,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum TileState {
+    Correct,
+    Absent,
+    Present,
+    Unknown,
+}
+
+impl fmt::Display for TileState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TileState::Correct => write!(f, "correct"),
+            TileState::Absent => write!(f, "absent"),
+            TileState::Present => write!(f, "present"),
+            TileState::Unknown => write!(f, "unknown"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -96,8 +120,11 @@ pub struct State {
     pub known_at_least_counts: Vec<HashMap<char, usize>>,
     pub discovered_characters: HashSet<char>,
 
-    pub guesses: Vec<Vec<char>>,
-    pub previous_guesses: Vec<Vec<char>>,
+    // pub tiles: Vec<Vec<(char, TileState)>>,
+    pub keyboard: HashMap<char, TileState>,
+
+    pub guesses: Vec<Vec<(char, TileState)>>,
+    pub previous_guesses: Vec<Vec<(char, TileState)>>,
     pub current_guess: usize,
 
     pub streak: usize,
@@ -121,6 +148,15 @@ impl State {
         let known_at_least_counts = std::iter::repeat(HashMap::new())
             .take(max_guesses)
             .collect::<Vec<_>>();
+
+        let keyboard = ALLOWED_KEYS
+            .iter()
+            .map(|&key| (key, TileState::Unknown))
+            .collect::<HashMap<_, _>>();
+
+        // let tiles = std::iter::repeat(vec![(' ', TileState::Unknown); word_length])
+        //     .take(max_guesses)
+        //     .collect::<Vec<_>>();
 
         Self {
             word,
@@ -147,6 +183,9 @@ impl State {
             known_at_least_counts,
             discovered_characters: HashSet::new(),
 
+            // tiles,
+            keyboard,
+
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
@@ -157,104 +196,120 @@ impl State {
         }
     }
 
-    pub fn map_guess_row(&self, guess: &[char], guess_round: usize) -> Vec<Option<&'static str>> {
-        let mut mappings = vec![None; self.word_length];
+    // TODO: make this only modify one row
+    pub fn update_tile_states(&mut self) {
+        for (row, guess) in self.guesses.iter_mut().enumerate() {
+            // let mut row_tiles: Vec<(char, TileState)> = vec![(' ', TileState::Unknown); self.word_length];
 
-        let mut revealed: HashMap<char, usize> = HashMap::new();
+            // Current row uses different logic while guessing
+            if row == self.current_guess && self.is_guessing {
+                for (index, (character, tile_state)) in guess.iter_mut().enumerate() {
+                    match self.known_states[row].get(&(*character, index)) {
+                        Some(CharacterState::Correct) => {
+                            *tile_state = TileState::Correct;
+                        }
+                        Some(CharacterState::Absent) => {
+                            *tile_state = TileState::Absent;
+                        }
+                        _ => {
+                            let is_count_unknown = !self.known_at_least_counts[self.current_guess]
+                                .contains_key(character);
+            
+                            let is_absent = is_count_unknown
+                                && self.known_states[self.current_guess]
+                                    .iter()
+                                    .any(|((c, _index), state)| {
+                                        c == character && state == &CharacterState::Absent
+                                    });
 
-        for (index, character) in guess.iter().enumerate() {
-            if let Some(CharacterState::Correct) =
-                self.known_states[guess_round].get(&(*character, index))
-            {
-                revealed
-                    .entry(*character)
-                    .and_modify(|count| *count += 1)
-                    .or_insert(1);
-            }
-        }
-
-        for (index, character) in guess.iter().enumerate() {
-            match self.known_states[guess_round].get(&(*character, index)) {
-                Some(CharacterState::Correct) => {
-                    mappings[index] = Some("correct");
+                            if is_absent {
+                                *tile_state = TileState::Absent;
+                            } else if self.discovered_characters.contains(character) {
+                                *tile_state = TileState::Present;
+                            } else {
+                                *tile_state = TileState::Unknown;
+                            }
+                        }
+                    }
                 }
-                Some(CharacterState::Absent) => {
-                    let seen = revealed
+                // self.guesses[row] = row_tiles;
+                continue;
+            }
+
+            let mut revealed_count_on_row: HashMap<char, usize> = HashMap::with_capacity(self.word_length);
+
+            for (index, (character, _)) in guess.iter().enumerate() {
+                if let Some(CharacterState::Correct) =
+                    self.known_states[row].get(&(*character, index))
+                {
+                    revealed_count_on_row
                         .entry(*character)
                         .and_modify(|count| *count += 1)
                         .or_insert(1);
+                }
+            }
 
-                    let at_least = self.known_at_least_counts[guess_round]
-                        .get(character)
-                        .unwrap_or(&0);
+            for (index, (character, tile_state)) in guess.into_iter().enumerate() {
+                match self.known_states[row].get(&(*character, index)) {
+                    Some(CharacterState::Correct) => {
+                        *tile_state = TileState::Correct;
+                    }
+                    Some(CharacterState::Absent) => {
+                        let revealed = revealed_count_on_row
+                            .entry(*character)
+                            .and_modify(|count| *count += 1)
+                            .or_insert(1);
 
-                    if *seen <= *at_least {
-                        mappings[index] = Some("present");
-                    } else {
-                        mappings[index] = Some("absent");
+                        let at_least = self.known_at_least_counts[row]
+                            .get(character)
+                            .unwrap_or(&0);
+
+                        if *revealed <= *at_least {
+                            *tile_state = TileState::Present;
+                        } else {
+                            *tile_state = TileState::Absent;
+                        }
+                    }
+                    _ => {
+                        *tile_state = TileState::Unknown;
                     }
                 }
-                _ => {
-                    mappings[index] = None;
-                }
             }
-        }
 
-        mappings
-    }
-
-    pub fn map_current_row(&self, character_and_index: &(char, usize)) -> Option<&'static str> {
-        match self.known_states[self.current_guess].get(character_and_index) {
-            Some(CharacterState::Correct) => Some("correct"),
-            Some(CharacterState::Absent) => Some("absent"),
-            _ => {
-                let is_count_unknown = !self.known_at_least_counts[self.current_guess]
-                    .contains_key(&character_and_index.0);
-
-                let is_absent = is_count_unknown
-                    && self.known_states[self.current_guess]
-                        .iter()
-                        .any(|((c, _index), state)| {
-                            c == &character_and_index.0 && state == &CharacterState::Absent
-                        });
-                if is_absent {
-                    return Some("absent");
-                }
-                if self.discovered_characters.contains(&character_and_index.0) {
-                    return Some("present");
-                }
-                None
-            }
+            // self.tiles[row] = row_tiles;
         }
     }
 
-    pub fn map_keyboard_state(&self, character: &char) -> Option<&'static str> {
-        let is_correct = self.known_states[self.current_guess]
-            .iter()
-            .any(|((c, _index), state)| c == character && state == &CharacterState::Correct);
-        if is_correct {
-            return Some("correct");
-        }
-
-        let is_count_unknown =
-            !self.known_at_least_counts[self.current_guess].contains_key(character);
-
-        let is_absent = is_count_unknown
-            && self.known_states[self.current_guess]
+    pub fn update_keyboard(&mut self) {
+        for (key, state) in self.keyboard.iter_mut() {
+            let is_correct = self.known_states[self.current_guess]
                 .iter()
-                .any(|((c, _index), state)| c == character && state == &CharacterState::Absent);
-
-        if is_absent {
-            Some("absent")
-        } else if self.discovered_characters.contains(character) {
-            Some("present")
-        } else {
-            None
+                .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
+            if is_correct {
+                *state = TileState::Correct;
+                return;
+            }
+    
+            let is_count_unknown =
+                !self.known_at_least_counts[self.current_guess].contains_key(key);
+    
+            let is_absent = is_count_unknown
+                && self.known_states[self.current_guess]
+                    .iter()
+                    .any(|((c, _index), state)| c == key && state == &CharacterState::Absent);
+    
+            if is_absent {
+                *state = TileState::Absent;
+            } else if self.discovered_characters.contains(key) {
+                *state = TileState::Present
+            } else {
+                *state = TileState::Unknown;
+            }
         }
     }
 
-    pub fn reveal_current_guess(&mut self) {
-        for (index, character) in self.guesses[self.current_guess].iter().enumerate() {
+    pub fn submit_current_guess(&mut self) {
+        for (index, (character, _)) in self.guesses[self.current_guess].iter().enumerate() {
             let known = self.known_states[self.current_guess]
                 .entry((*character, index))
                 .or_insert(CharacterState::Unknown);
@@ -272,7 +327,7 @@ impl State {
                     let count_in_word = self.word.iter().filter(|c| *c == character).count();
                     let count_in_guess = self.guesses[self.current_guess]
                         .iter()
-                        .filter(|c| *c == character)
+                        .filter(|(c, _)| c == character)
                         .count();
                     if count_in_guess >= count_in_word {
                         if count_in_word > *at_least {
@@ -332,7 +387,7 @@ impl State {
                 &self
                     .guesses
                     .iter()
-                    .map(|guess| guess.iter().collect::<String>())
+                    .map(|guess| guess.iter().map(|(c, _)| c).collect::<String>())
                     .collect::<Vec<String>>()
                     .join(","),
             )?;
@@ -399,9 +454,9 @@ impl State {
         let today = Local::now().naive_local().date();
         if let Some(solve) = self.daily_word_history.get(&today).cloned() {
             for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                self.guesses[guess_index] = guess.clone();
+                self.guesses[guess_index] = guess.iter().map(|c| (*c, TileState::Unknown)).collect();
                 self.current_guess = guess_index;
-                self.reveal_current_guess();
+                self.submit_current_guess();
             }
             self.is_guessing = solve.is_guessing;
             self.is_winner = solve.is_winner;
@@ -413,6 +468,10 @@ impl State {
                 self.message = EMPTY.to_string()
             }
         }
+
+        // Update how tiles and keyboard is displayed
+        self.update_tile_states();
+        self.update_keyboard();
     }
 
     pub fn rehydrate_game(&mut self) -> Result<(), JsValue> {
@@ -450,12 +509,12 @@ impl State {
 
             let guesses_item = local_storage.get_item("guesses")?;
             if let Some(guesses_str) = guesses_item {
-                let previous_guesses = guesses_str.split(',').map(|guess| guess.chars().collect());
+                let previous_guesses = guesses_str.split(',').map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
 
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
                     self.current_guess = guess_index;
-                    self.reveal_current_guess();
+                    self.submit_current_guess();
                 }
             }
 
@@ -562,6 +621,10 @@ impl State {
             }
         }
 
+        // Update how tiles and keyboard is displayed
+        self.update_tile_states();
+        self.update_keyboard();
+
         Ok(())
     }
 
@@ -597,7 +660,11 @@ impl State {
         }
 
         self.clear_message();
-        self.guesses[self.current_guess].push(character);
+        // TODO: Calculate the tilestate for current row, so that we don't need to do full update_tile_states?
+        self.guesses[self.current_guess].push((character, TileState::Unknown));
+
+        self.update_tile_states();
+        self.update_keyboard();
         true
     }
 
@@ -608,6 +675,9 @@ impl State {
 
         self.clear_message();
         self.guesses[self.current_guess].pop();
+
+        self.update_tile_states();
+        self.update_keyboard();
         true
     }
 
@@ -615,12 +685,12 @@ impl State {
         self.is_guessing && self.guesses[self.current_guess].len() == self.word_length
     }
 
-    fn is_guess_word(&self) -> bool {
-        self.word_list.contains(&self.guesses[self.current_guess])
+    fn is_guess_real_word(&self) -> bool {
+        self.word_list.contains(&self.guesses[self.current_guess].iter().map(|(c, _)| *c).collect())
     }
 
     fn is_correct_word(&self) -> bool {
-        self.guesses[self.current_guess] == self.word
+        self.guesses[self.current_guess].iter().map(|(c, _)| *c).collect::<Vec<char>>() == self.word
     }
 
     fn is_game_ended(&self) -> bool {
@@ -657,7 +727,7 @@ impl State {
             DailyWordHistory {
                 word: self.word.iter().collect(),
                 date: *date,
-                guesses: self.guesses.clone(),
+                guesses: self.guesses.iter().map(|guess| guess.iter().map(|(c, _)| *c).collect()).collect(),
                 current_guess: self.current_guess,
                 is_guessing: self.is_guessing,
                 is_winner: self.is_winner,
@@ -687,7 +757,7 @@ impl State {
             self.message = "Liian vähän kirjaimia!".to_owned();
             return true;
         }
-        if !self.is_guess_word() {
+        if !self.is_guess_real_word() {
             self.is_unknown = true;
             self.message = "Ei sanulistalla.".to_owned();
             return true;
@@ -697,7 +767,7 @@ impl State {
         self.clear_message();
 
         self.is_winner = self.is_correct_word();
-        self.reveal_current_guess();
+        self.submit_current_guess();
     
         if self.is_game_ended() {
             self.is_guessing = false;
@@ -718,6 +788,10 @@ impl State {
         } else {
             let _result = self.persist_game();
         }
+
+        // Update how tiles and keyboard is displayed
+        self.update_tile_states();
+        self.update_keyboard();
 
         true
     }
@@ -761,11 +835,11 @@ impl State {
                 .take(self.max_guesses - 1)
                 .collect::<Vec<_>>();
 
-            self.guesses.push(previous_word);
+            self.guesses.push(previous_word.iter().map(|c| (*c, TileState::Unknown)).collect());
             self.guesses.extend(empty_guesses);
 
             self.current_guess = 0;
-            self.reveal_current_guess();
+            self.submit_current_guess();
             self.current_guess = 1;
         } else {
             self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
@@ -784,9 +858,9 @@ impl State {
             let today = Local::now().naive_local().date();
             if let Some(solve) = self.daily_word_history.get(&today).cloned() {
                 for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                    self.guesses[guess_index] = guess.clone();
+                    self.guesses[guess_index] = guess.iter().map(|c| (*c, TileState::Unknown)).collect();
                     self.current_guess = guess_index;
-                    self.reveal_current_guess();
+                    self.submit_current_guess();
                 }
                 self.is_winner = solve.is_winner;
                 self.is_guessing = solve.is_guessing;
@@ -799,6 +873,10 @@ impl State {
         } else {
             let _result = self.persist_game();
         }
+
+        // Update how tiles and keyboard is displayed
+        self.update_tile_states();
+        self.update_keyboard();
 
         true
     }

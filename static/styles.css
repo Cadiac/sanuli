@@ -203,7 +203,7 @@ a {
     border-radius: 6px;
     color: var(--white);
 
-    touch-action: manipulation;
+    touch-action: none;
     cursor: pointer;
     user-select: none;
 
