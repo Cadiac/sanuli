@@ -96,7 +96,7 @@ impl Component for App {
     }
 
     fn destroy(&mut self, _: &Context<Self>) {
-        // remove the keyboard listener
+        // Remove the keyboard listener
         if let Some(listener) = self.keyboard_listener.take() {
             let window: Window = window().expect("window not available");
             window
