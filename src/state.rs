@@ -80,7 +80,7 @@ impl fmt::Display for TileState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct DailyWordHistory {
     date: NaiveDate,
     word: String,
@@ -90,6 +90,7 @@ pub struct DailyWordHistory {
     is_winner: bool,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct State {
     pub word_list: Vec<Vec<char>>,
     pub word: Vec<char>,
