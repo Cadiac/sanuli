@@ -165,6 +165,13 @@ impl Component for App {
             .map(|key| (*key, self.state.map_keyboard_tilestate(key)))
             .collect::<HashMap<char, TileState>>();
 
+        let word = self.state.word.iter().collect::<String>();
+
+        let last_guess = self.state.guesses[self.state.current_guess]
+            .iter()
+            .map(|(c, _)| c)
+            .collect::<String>();
+
         html! {
             <div class="game">
                 <Header
@@ -192,8 +199,8 @@ impl Component for App {
                     is_guessing={self.state.is_guessing}
                     game_mode={self.state.game_mode}
                     message={self.state.message.clone()}
-                    word={self.state.word.iter().collect::<String>()}
-                    last_guess={self.state.guesses[self.state.current_guess].iter().map(|(c, _)| c).collect::<String>()}
+                    word={word}
+                    last_guess={last_guess}
                     keyboard={keyboard_state}
                 />
 
