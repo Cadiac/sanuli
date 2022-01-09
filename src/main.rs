@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
@@ -11,7 +12,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use state::{GameMode, State};
+use state::{GameMode, State, TileState};
 
 const ALLOWED_KEYS: [char; 29] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
@@ -159,6 +160,11 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
 
+        let keyboard_state = ALLOWED_KEYS
+            .iter()
+            .map(|key| (*key, self.state.map_keyboard_tilestate(key)))
+            .collect::<HashMap<char, TileState>>();
+
         html! {
             <div class="game">
                 <Header
@@ -188,7 +194,7 @@ impl Component for App {
                     message={self.state.message.clone()}
                     word={self.state.word.iter().collect::<String>()}
                     last_guess={self.state.guesses[self.state.current_guess].iter().map(|(c, _)| c).collect::<String>()}
-                    keyboard={self.state.keyboard.clone()}
+                    keyboard={keyboard_state}
                 />
 
                 {

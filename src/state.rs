@@ -16,11 +16,6 @@ const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 
-const ALLOWED_KEYS: [char; 29] = [
-    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
-    'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
-];
-
 fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
     words
         .lines()
@@ -120,7 +115,6 @@ pub struct State {
     pub known_at_least_counts: Vec<HashMap<char, usize>>,
     pub discovered_characters: HashSet<char>,
 
-    pub keyboard: HashMap<char, TileState>,
     pub guesses: Vec<Vec<(char, TileState)>>,
     pub previous_guesses: Vec<Vec<(char, TileState)>>,
     pub current_guess: usize,
@@ -147,11 +141,6 @@ impl State {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let keyboard = ALLOWED_KEYS
-            .iter()
-            .map(|&key| (key, TileState::Unknown))
-            .collect::<HashMap<_, _>>();
-
         Self {
             word,
             word_list,
@@ -176,8 +165,6 @@ impl State {
             known_states,
             known_at_least_counts,
             discovered_characters: HashSet::new(),
-
-            keyboard,
 
             guesses,
             previous_guesses: Vec::new(),
@@ -265,31 +252,28 @@ impl State {
         }
     }
 
-    pub fn update_keyboard(&mut self) {
-        for (key, state) in self.keyboard.iter_mut() {
-            let is_correct = self.known_states[self.current_guess]
+    pub fn map_keyboard_tilestate(&self, key: &char) -> TileState {
+        let is_correct = self.known_states[self.current_guess]
+            .iter()
+            .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
+        if is_correct {
+            return TileState::Correct;
+        }
+
+        let is_count_unknown =
+            !self.known_at_least_counts[self.current_guess].contains_key(key);
+
+        let is_absent = is_count_unknown
+            && self.known_states[self.current_guess]
                 .iter()
-                .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
-            if is_correct {
-                *state = TileState::Correct;
-                return;
-            }
-    
-            let is_count_unknown =
-                !self.known_at_least_counts[self.current_guess].contains_key(key);
-    
-            let is_absent = is_count_unknown
-                && self.known_states[self.current_guess]
-                    .iter()
-                    .any(|((c, _index), state)| c == key && state == &CharacterState::Absent);
-    
-            if is_absent {
-                *state = TileState::Absent;
-            } else if self.discovered_characters.contains(key) {
-                *state = TileState::Present
-            } else {
-                *state = TileState::Unknown;
-            }
+                .any(|((c, _index), state)| c == key && state == &CharacterState::Absent);
+
+        if is_absent {
+            return TileState::Absent;
+        } else if self.discovered_characters.contains(key) {
+            return TileState::Present
+        } else {
+            return TileState::Unknown;
         }
     }
 
@@ -455,8 +439,6 @@ impl State {
                 self.message = EMPTY.to_string()
             }
         }
-
-        self.update_keyboard();
     }
 
     pub fn rehydrate_game(&mut self) -> Result<(), JsValue> {
@@ -606,8 +588,6 @@ impl State {
             }
         }
 
-        self.update_keyboard();
-
         Ok(())
     }
 
@@ -645,7 +625,6 @@ impl State {
         self.guesses[self.current_guess].push((character, TileState::Unknown));
 
         self.update_current_guess_tiles();
-        self.update_keyboard();
         true
     }
 
@@ -658,7 +637,6 @@ impl State {
         self.guesses[self.current_guess].pop();
 
         self.update_current_guess_tiles();
-        self.update_keyboard();
         true
     }
 
@@ -770,8 +748,6 @@ impl State {
             let _result = self.persist_game();
         }
 
-        self.update_keyboard();
-
         true
     }
 
@@ -852,8 +828,6 @@ impl State {
         } else {
             let _result = self.persist_game();
         }
-
-        self.update_keyboard();
 
         true
     }
