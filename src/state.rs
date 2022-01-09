@@ -177,7 +177,7 @@ impl State {
         }
     }
 
-    pub fn map_keyboard_tilestate(&self, key: &char) -> TileState {
+    pub fn keyboard_tilestate(&self, key: &char) -> TileState {
         let is_correct = self.known_states[self.current_guess]
             .iter()
             .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
@@ -202,33 +202,31 @@ impl State {
         }
     }
 
-    fn update_current_guess_tiles(&mut self) {
-        for (index, (character, tile_state)) in self.guesses[self.current_guess].iter_mut().enumerate() {
-            match self.known_states[self.current_guess].get(&(*character, index)) {
-                Some(CharacterState::Correct) => {
-                    *tile_state = TileState::Correct;
-                }
-                Some(CharacterState::Absent) => {
-                    *tile_state = TileState::Absent;
-                }
-                _ => {
-                    let is_count_unknown = !self.known_at_least_counts[self.current_guess]
-                        .contains_key(character);
+    fn current_guess_state(&mut self, character: char, index: usize) -> TileState {
+        match self.known_states[self.current_guess].get(&(character, index)) {
+            Some(CharacterState::Correct) => {
+                return TileState::Correct;
+            }
+            Some(CharacterState::Absent) => {
+                return TileState::Absent;
+            }
+            _ => {
+                let is_count_unknown = !self.known_at_least_counts[self.current_guess]
+                    .contains_key(&character);
 
-                    let is_absent = is_count_unknown
-                        && self.known_states[self.current_guess]
-                            .iter()
-                            .any(|((c, _index), state)| {
-                                c == character && state == &CharacterState::Absent
-                            });
+                let is_absent = is_count_unknown
+                    && self.known_states[self.current_guess]
+                        .iter()
+                        .any(|((c, _index), state)| {
+                            c == &character && state == &CharacterState::Absent
+                        });
 
-                    if is_absent {
-                        *tile_state = TileState::Absent;
-                    } else if self.discovered_characters.contains(character) {
-                        *tile_state = TileState::Present;
-                    } else {
-                        *tile_state = TileState::Unknown;
-                    }
+                if is_absent {
+                    return TileState::Absent;
+                } else if self.discovered_characters.contains(&character) {
+                    return TileState::Present;
+                } else {
+                    return TileState::Unknown;
                 }
             }
         }
@@ -324,40 +322,15 @@ impl State {
         self.update_row_tiles(self.current_guess);
     }
 
-    pub fn get_random_word(&self) -> Vec<char> {
-        self.word_list
-            .choose(&mut rand::thread_rng())
-            .unwrap()
-            .clone()
-    }
-
-    pub fn get_daily_word_index(&self) -> usize {
-        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        Local::now()
-            .naive_local()
-            .date()
-            .signed_duration_since(epoch)
-            .num_days() as usize
-    }
-
-    pub fn get_daily_word(&self) -> Vec<char> {
-        DAILY_WORDS
-            .lines()
-            .nth(self.get_daily_word_index())
-            .unwrap()
-            .chars()
-            .collect()
-    }
-
     pub fn push_character(&mut self, character: char) -> bool {
         if !self.is_guessing || self.guesses[self.current_guess].len() >= self.word_length {
             return false;
         }
 
         self.clear_message();
-        self.guesses[self.current_guess].push((character, TileState::Unknown));
 
-        self.update_current_guess_tiles();
+        let tile_state = self.current_guess_state(character, self.guesses[self.current_guess].len());
+        self.guesses[self.current_guess].push((character, tile_state));
         true
     }
 
@@ -369,7 +342,6 @@ impl State {
         self.clear_message();
         self.guesses[self.current_guess].pop();
 
-        self.update_current_guess_tiles();
         true
     }
 
@@ -482,6 +454,31 @@ impl State {
         }
 
         true
+    }
+
+    pub fn get_random_word(&self) -> Vec<char> {
+        self.word_list
+            .choose(&mut rand::thread_rng())
+            .unwrap()
+            .clone()
+    }
+
+    pub fn get_daily_word_index(&self) -> usize {
+        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
+        Local::now()
+            .naive_local()
+            .date()
+            .signed_duration_since(epoch)
+            .num_days() as usize
+    }
+
+    pub fn get_daily_word(&self) -> Vec<char> {
+        DAILY_WORDS
+            .lines()
+            .nth(self.get_daily_word_index())
+            .unwrap()
+            .chars()
+            .collect()
     }
 
     pub fn create_new_game(&mut self) -> bool {

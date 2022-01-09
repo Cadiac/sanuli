@@ -162,7 +162,7 @@ impl Component for App {
 
         let keyboard_state = ALLOWED_KEYS
             .iter()
-            .map(|key| (*key, self.state.map_keyboard_tilestate(key)))
+            .map(|key| (*key, self.state.keyboard_tilestate(key)))
             .collect::<HashMap<char, TileState>>();
 
         let word = self.state.word.iter().collect::<String>();
