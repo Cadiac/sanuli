@@ -24,7 +24,7 @@ pub fn message(props: &Props) -> Html {
                     let last_guess = props.last_guess.to_lowercase();
 
                     html! {
-                        <a href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, last_guess)}
+                        <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, last_guess)}
                             target="_blank">{ "Ehdota lisäystä?" }
                         </a>
                     }
@@ -33,11 +33,11 @@ pub fn message(props: &Props) -> Html {
 
                     html! {
                         <>
-                            <a href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
+                            <a class="link" href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
                                 target="_blank">{ "Sanakirja" }
                             </a>
                             {" | "}
-                            <a href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
+                            <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
                                 target="_blank">{ "Ehdota poistoa?" }
                             </a>
                         </>

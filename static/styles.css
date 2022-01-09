@@ -105,7 +105,7 @@ header {
     text-align: center;
 }
 
-a {
+.link {
     color: var(--text);
 }
 
@@ -497,4 +497,15 @@ a {
 .select-active {
     background-color: var(--absent);
     border: 2px solid var(--correct);
+}
+
+.version {
+    margin-top: 6px;
+    margin-bottom: 0px;
+    color: var(--absent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.2rem;
+    text-align: center;
+    text-decoration: none;
 }

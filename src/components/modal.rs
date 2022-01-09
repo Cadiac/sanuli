@@ -4,6 +4,8 @@ use crate::state::GameMode;
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
+const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
+const VERSION: &str = "v1.0";
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct HelpModalProps {
@@ -40,10 +42,10 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
     
             <p>
                 {"Käytetyn sanalistan pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
-                <a href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
+                <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
                 {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. "}
                 {"Sanalistaa muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuihin "}
-                <a href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
+                <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {"."}
             </p>
         </div>
@@ -127,6 +129,9 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         {"Päivän sanuli"}
                     </button>
                 </div>
+            </div>
+            <div class="version">
+                <a class="version" href={CHANGELOG_URL} target="_blank">{ VERSION }</a>
             </div>
         </div>
     }
