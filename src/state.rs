@@ -5,8 +5,8 @@ use std::fmt;
 use std::mem;
 use std::str::FromStr;
 
-use chrono::{Local, NaiveDate};
-use wasm_bindgen::JsValue;
+use chrono::{Local, NaiveDate, Utc, DateTime};
+use wasm_bindgen::{JsValue};
 use web_sys::{window, Window};
 
 const FULL_WORDS: &str = include_str!("../full-words.txt");
@@ -85,6 +85,7 @@ pub enum GameMode {
     Classic,
     Relay,
     DailyWord,
+    TimeAttack,
 }
 
 impl FromStr for GameMode {
@@ -95,6 +96,7 @@ impl FromStr for GameMode {
             "classic" => Ok(GameMode::Classic),
             "relay" => Ok(GameMode::Relay),
             "daily_word" => Ok(GameMode::DailyWord),
+            "time_attack" => Ok(GameMode::TimeAttack),
             _ => Err(()),
         }
     }
@@ -106,6 +108,7 @@ impl fmt::Display for GameMode {
             GameMode::Classic => write!(f, "classic"),
             GameMode::Relay => write!(f, "relay"),
             GameMode::DailyWord => write!(f, "daily_word"),
+            GameMode::TimeAttack => write!(f, "time_attack"),
         }
     }
 }
@@ -181,6 +184,13 @@ pub enum CharacterCount {
 }
 
 #[derive(Clone, PartialEq)]
+pub struct TimeAttack {
+    pub round: usize,
+    pub start_time: DateTime<Utc>,
+    pub duration: usize,
+}
+
+#[derive(Clone, PartialEq)]
 pub struct State {
     pub word: Vec<char>,
 
@@ -216,6 +226,8 @@ pub struct State {
     pub max_streak: usize,
     pub total_played: usize,
     pub total_solved: usize,
+
+    pub time_attack: Option<TimeAttack>
 }
 
 impl State {
@@ -280,6 +292,8 @@ impl State {
             max_streak: 0,
             total_played: 0,
             total_solved: 0,
+
+            time_attack: None,
         }
     }
 
@@ -743,10 +757,17 @@ impl State {
     pub fn change_game_mode(&mut self, new_mode: GameMode) {
         self.previous_game_mode = std::mem::replace(&mut self.game_mode, new_mode);
         self.message = EMPTY.to_string();
+        self.time_attack = None;
         let _result = self.persist_settings();
 
         if self.game_mode == GameMode::DailyWord {
             self.word_length = 5;
+        } else if self.game_mode == GameMode::TimeAttack {
+            self.time_attack = Some(TimeAttack {
+                round: 1,
+                start_time: Utc::now(),
+                duration: 60,
+            });
         }
     }
 
@@ -1035,7 +1056,7 @@ impl State {
                 GameMode::DailyWord => {
                     self.rehydrate_daily_word();
                 }
-                GameMode::Classic | GameMode::Relay => {
+                GameMode::Classic | GameMode::Relay | GameMode::TimeAttack => {
                     self.rehydrate_game()?;
                 }
             }

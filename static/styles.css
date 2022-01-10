@@ -531,3 +531,23 @@ header {
     text-align: center;
     text-decoration: none;
 }
+
+@keyframes depletingBar {
+    0% {
+        width: 100%;
+    }
+    100% {
+        width: 0;
+    }
+}
+
+.bar-outline {
+    border: 2px solid var(--white);
+    height: 10px;
+}
+
+.bar {
+    animation-fill-mode: both;
+    height: 100%;
+    background-color: var(--text);
+}

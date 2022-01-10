@@ -89,6 +89,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
     let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
     let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord));
+    let change_game_mode_time_attack = onmousedown!(callback, Msg::ChangeGameMode(GameMode::TimeAttack));
     let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
     let change_allow_profanities_yes = onmousedown!(callback, Msg::ChangeAllowProfanities(true));
@@ -148,6 +149,10 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <button class={classes!("select", (props.game_mode == GameMode::Relay).then(|| Some("select-active")))}
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
+                    </button>
+                    <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
+                        onclick={change_game_mode_time_attack}>
+                        {"Nopeuspeli"}
                     </button>
                     <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>

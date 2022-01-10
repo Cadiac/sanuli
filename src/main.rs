@@ -11,6 +11,7 @@ use components::{
     header::Header,
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
+    timer::Timer,
 };
 use state::{GameMode, State, TileState, WordList, Theme};
 
@@ -209,6 +210,17 @@ impl Component for App {
                     max_guesses={self.state.max_guesses}
                     word_length={self.state.word_length}
                 />
+
+                {
+                    if self.state.game_mode == GameMode::TimeAttack {
+                        let time_attack = self.state.time_attack.as_ref().unwrap();
+                        html! {
+                            <Timer duration={time_attack.duration} is_paused={!self.state.is_guessing} />
+                        }
+                    } else {
+                        html! {}
+                    }
+                }
 
                 <Keyboard
                     callback={link.callback(move |msg| msg)}
