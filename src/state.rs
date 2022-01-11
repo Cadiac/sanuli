@@ -188,54 +188,49 @@ impl State {
             return TileState::Correct;
         }
 
-        let is_count_unknown = !self.discovered_counts[self.current_guess].contains_key(key);
-
-        let is_absent = is_count_unknown
-            && self.known_states[self.current_guess]
-                .iter()
-                .any(|((c, _index), state)| c == key && state == &CharacterState::Absent);
-
-        if is_absent {
-            return TileState::Absent;
-        }
-        
         match self.discovered_counts[self.current_guess].get(key) {
-            Some(CharacterCount::AtLeast(count)) | Some(CharacterCount::Exactly(count)) => {
-                if *count > 0 {
-                    return TileState::Present
+            Some(CharacterCount::AtLeast(count)) => {
+                if *count == 0 {
+                    return TileState::Unknown;
                 }
-
-                TileState::Unknown
-            },
-            None => TileState::Unknown
+                TileState::Present
+            }
+            Some(CharacterCount::Exactly(count)) => {
+                if *count == 0 {
+                    return TileState::Absent;
+                }
+                TileState::Present
+            }
+            None => TileState::Unknown,
         }
     }
 
     fn current_guess_state(&mut self, character: char, index: usize) -> TileState {
         match self.known_states[self.current_guess].get(&(character, index)) {
-            Some(CharacterState::Correct) => {
-                return TileState::Correct;
-            }
-            Some(CharacterState::Absent) => {
-                return TileState::Absent;
-            }
+            Some(CharacterState::Correct) => TileState::Correct,
+            Some(CharacterState::Absent) => TileState::Absent,
             _ => {
-                let is_count_unknown =
-                    !self.discovered_counts[self.current_guess].contains_key(&character);
-
-                let is_absent = is_count_unknown
-                    && self.known_states[self.current_guess]
-                        .iter()
-                        .any(|((c, _index), state)| {
-                            c == &character && state == &CharacterState::Absent
-                        });
-
-                if is_absent {
-                    return TileState::Absent;
-                }
-
                 match self.discovered_counts[self.current_guess].get(&character) {
-                    Some(CharacterCount::Exactly(_)) => TileState::Absent,
+                    Some(CharacterCount::Exactly(count)) => {
+                        // We may know the exact count, but not the exact index of any characters..
+                        if *count == 0 {
+                            return TileState::Absent;
+                        }
+
+                        let is_every_correct_found = self.known_states[self.current_guess]
+                            .iter()
+                            .filter(|((c, _i), state)| {
+                                c == &character && *state == &CharacterState::Correct
+                            })
+                            .count()
+                            == *count;
+
+                        if !is_every_correct_found {
+                            return TileState::Present;
+                        }
+
+                        TileState::Absent
+                    }
                     Some(CharacterCount::AtLeast(_)) => TileState::Present,
                     None => TileState::Unknown,
                 }
@@ -303,37 +298,40 @@ impl State {
             } else {
                 *known = CharacterState::Absent;
 
-                if self.word.contains(character) {
-                    let discovered_count = self.discovered_counts[self.current_guess]
-                        .entry(*character)
-                        .or_insert(CharacterCount::AtLeast(0));
+                let discovered_count = self.discovered_counts[self.current_guess]
+                    .entry(*character)
+                    .or_insert(CharacterCount::AtLeast(0));
 
-                    // At most the same amount of characters as in the word are highlighted
-                    let count_in_word = self.word.iter().filter(|c| *c == character).count();
-                    let count_in_guess = self.guesses[self.current_guess]
-                        .iter()
-                        .filter(|(c, _)| c == character)
-                        .count();
+                // At most the same amount of characters are highlighted as there are in the word
+                let count_in_word = self.word.iter().filter(|c| *c == character).count();
+                if count_in_word == 0 {
+                    *discovered_count = CharacterCount::Exactly(0);
+                    continue;
+                }
 
-                    match discovered_count {
-                        CharacterCount::AtLeast(count) => {
-                            if count_in_guess > count_in_word {
-                                if count_in_word >= *count {
-                                    // The guess had more copies of the character than the word,
-                                    // the exact count is revealed
-                                    *discovered_count = CharacterCount::Exactly(count_in_word);
-                                }
-                            } else if count_in_guess == count_in_word {
-                                // The count had the exact count but that isn't revealed yet
-                                *discovered_count = CharacterCount::AtLeast(count_in_guess);
-                            } else if count_in_guess > *count {
-                                // Found more, but the exact count is still unknown
-                                *discovered_count = CharacterCount::AtLeast(count_in_guess);
+                let count_in_guess = self.guesses[self.current_guess]
+                    .iter()
+                    .filter(|(c, _)| c == character)
+                    .count();
+
+                match discovered_count {
+                    CharacterCount::AtLeast(count) => {
+                        if count_in_guess > count_in_word {
+                            if count_in_word >= *count {
+                                // The guess had more copies of the character than the word,
+                                // the exact count is revealed
+                                *discovered_count = CharacterCount::Exactly(count_in_word);
                             }
+                        } else if count_in_guess == count_in_word {
+                            // The count had the exact count but that isn't revealed yet
+                            *discovered_count = CharacterCount::AtLeast(count_in_guess);
+                        } else if count_in_guess > *count {
+                            // Found more, but the exact count is still unknown
+                            *discovered_count = CharacterCount::AtLeast(count_in_guess);
                         }
-                        // Exact count should never change
-                        CharacterCount::Exactly(_) => {}
                     }
+                    // Exact count should never change
+                    CharacterCount::Exactly(_) => {}
                 }
             }
         }
