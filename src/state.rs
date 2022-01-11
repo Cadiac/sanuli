@@ -189,20 +189,6 @@ pub struct TimeAttack {
     pub duration: u32,
 }
 
-// impl PartialEq for TimeAttack {
-//     fn eq(&self, other: &Self) -> bool {
-//         if self.round != other.round || self.duration != other.duration {
-//             return false;
-//         }
-
-//         if self.timeout.is_some() && other.timeout.is_some() {
-//             return Rc::ptr_eq(&self.timeout.unwrap(), &other.timeout.unwrap());
-//         } else {
-//             return self.timeout.is_none() && other.timeout.is_none();
-//         }
-//     }
-// }
-
 impl TimeAttack {
     pub fn new() -> Self {
         Self {
@@ -213,7 +199,7 @@ impl TimeAttack {
 
     pub fn next_round(&mut self) {
         self.round += 1;
-        self.duration = 60 - (self.round - 1) * 5;
+        self.duration = std::cmp::max(60 - (self.round - 1) * 5, 10);
     }
 }
 
@@ -635,9 +621,11 @@ impl State {
 
             let _result = self.persist_single_daily_word(&today);
         } else if self.game_mode == GameMode::TimeAttack {
-            // if let Some(timeout) = self.time_attack.unwrap().timeout.take() {
-            //     timeout.borrow_mut().cancel();
-            // }
+            if self.is_winner {
+                if let Some(time_attack) = self.time_attack.as_mut() {
+                    time_attack.next_round();
+                }
+            }
 
             let _result = self.persist_game();
         } else {
@@ -1103,8 +1091,12 @@ impl State {
                 GameMode::DailyWord => {
                     self.rehydrate_daily_word();
                 }
-                GameMode::Classic | GameMode::Relay | GameMode::TimeAttack => {
+                GameMode::Classic | GameMode::Relay => {
                     self.rehydrate_game()?;
+                }
+                GameMode::TimeAttack => {
+                    // Don't restore the game
+                    self.create_new_game();
                 }
             }
         }

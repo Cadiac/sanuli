@@ -191,7 +191,8 @@ impl Component for App {
                 self.state.change_game_mode(new_mode);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                self.state.create_new_game()
+                ctx.link().send_message(Msg::NewGame);
+                true
             }
             Msg::ChangePreviousGameMode => {
                 self.state.change_game_mode(self.state.previous_game_mode.clone());
@@ -252,7 +253,7 @@ impl Component for App {
                 />
 
                 {
-                    if self.state.game_mode == GameMode::TimeAttack {
+                    if self.state.game_mode == GameMode::TimeAttack && self.state.is_guessing {
                         if let Some(time_attack) = self.state.time_attack.as_ref() {
                             html! {
                                 <Timer duration={time_attack.duration} is_paused={!self.state.is_guessing} />
