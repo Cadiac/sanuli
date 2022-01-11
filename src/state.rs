@@ -1,12 +1,11 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::fmt;
 use std::mem;
 use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
-use wasm_bindgen::{JsValue};
+use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
 const WORDS: &str = include_str!("../word-list.txt");
@@ -120,7 +119,6 @@ pub struct State {
 
     pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
     pub discovered_counts: Vec<HashMap<char, CharacterCount>>,
-    pub discovered_characters: HashSet<char>,
 
     pub guesses: Vec<Vec<(char, TileState)>>,
     pub previous_guesses: Vec<Vec<(char, TileState)>>,
@@ -171,7 +169,6 @@ impl State {
 
             known_states,
             discovered_counts,
-            discovered_characters: HashSet::new(),
 
             guesses,
             previous_guesses: Vec::new(),
@@ -191,8 +188,7 @@ impl State {
             return TileState::Correct;
         }
 
-        let is_count_unknown =
-            !self.discovered_counts[self.current_guess].contains_key(key);
+        let is_count_unknown = !self.discovered_counts[self.current_guess].contains_key(key);
 
         let is_absent = is_count_unknown
             && self.known_states[self.current_guess]
@@ -201,10 +197,17 @@ impl State {
 
         if is_absent {
             return TileState::Absent;
-        } else if self.discovered_characters.contains(key) {
-            return TileState::Present
-        } else {
-            return TileState::Unknown;
+        }
+        
+        match self.discovered_counts[self.current_guess].get(key) {
+            Some(CharacterCount::AtLeast(count)) | Some(CharacterCount::Exactly(count)) => {
+                if *count > 0 {
+                    return TileState::Present
+                }
+
+                TileState::Unknown
+            },
+            None => TileState::Unknown
         }
     }
 
@@ -217,8 +220,8 @@ impl State {
                 return TileState::Absent;
             }
             _ => {
-                let is_count_unknown = !self.discovered_counts[self.current_guess]
-                    .contains_key(&character);
+                let is_count_unknown =
+                    !self.discovered_counts[self.current_guess].contains_key(&character);
 
                 let is_absent = is_count_unknown
                     && self.known_states[self.current_guess]
@@ -229,10 +232,12 @@ impl State {
 
                 if is_absent {
                     return TileState::Absent;
-                } else if self.discovered_characters.contains(&character) {
-                    return TileState::Present;
-                } else {
-                    return TileState::Unknown;
+                }
+
+                match self.discovered_counts[self.current_guess].get(&character) {
+                    Some(CharacterCount::Exactly(_)) => TileState::Absent,
+                    Some(CharacterCount::AtLeast(_)) => TileState::Present,
+                    None => TileState::Unknown,
                 }
             }
         }
@@ -240,7 +245,8 @@ impl State {
 
     fn reveal_row_tiles(&mut self, row: usize) {
         if let Some(guess) = self.guesses.get_mut(row) {
-            let mut revealed_count_on_row: HashMap<char, usize> = HashMap::with_capacity(self.word_length);
+            let mut revealed_count_on_row: HashMap<char, usize> =
+                HashMap::with_capacity(self.word_length);
 
             for (index, (character, _)) in guess.iter().enumerate() {
                 if let Some(CharacterState::Correct) =
@@ -286,7 +292,6 @@ impl State {
         }
     }
 
-
     pub fn submit_current_guess(&mut self) {
         for (index, (character, _)) in self.guesses[self.current_guess].iter().enumerate() {
             let known = self.known_states[self.current_guess]
@@ -329,8 +334,6 @@ impl State {
                         // Exact count should never change
                         CharacterCount::Exactly(_) => {}
                     }
-
-                    self.discovered_characters.insert(*character);
                 }
             }
         }
@@ -339,8 +342,7 @@ impl State {
         if self.current_guess < self.max_guesses - 1 {
             let next = self.current_guess + 1;
             self.known_states[next] = self.known_states[self.current_guess].clone();
-            self.discovered_counts[next] =
-                self.discovered_counts[self.current_guess].clone();
+            self.discovered_counts[next] = self.discovered_counts[self.current_guess].clone();
         }
 
         self.reveal_row_tiles(self.current_guess);
@@ -353,7 +355,8 @@ impl State {
 
         self.clear_message();
 
-        let tile_state = self.current_guess_state(character, self.guesses[self.current_guess].len());
+        let tile_state =
+            self.current_guess_state(character, self.guesses[self.current_guess].len());
         self.guesses[self.current_guess].push((character, tile_state));
         true
     }
@@ -374,11 +377,20 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        self.word_list.contains(&self.guesses[self.current_guess].iter().map(|(c, _)| *c).collect())
+        self.word_list.contains(
+            &self.guesses[self.current_guess]
+                .iter()
+                .map(|(c, _)| *c)
+                .collect(),
+        )
     }
 
     fn is_correct_word(&self) -> bool {
-        self.guesses[self.current_guess].iter().map(|(c, _)| *c).collect::<Vec<char>>() == self.word
+        self.guesses[self.current_guess]
+            .iter()
+            .map(|(c, _)| *c)
+            .collect::<Vec<char>>()
+            == self.word
     }
 
     fn is_game_ended(&self) -> bool {
@@ -404,8 +416,7 @@ impl State {
                 );
             }
         } else {
-            self.message =
-                format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
+            self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
         }
     }
 
@@ -415,7 +426,11 @@ impl State {
             DailyWordHistory {
                 word: self.word.iter().collect(),
                 date: *date,
-                guesses: self.guesses.iter().map(|guess| guess.iter().map(|(c, _)| *c).collect()).collect(),
+                guesses: self
+                    .guesses
+                    .iter()
+                    .map(|guess| guess.iter().map(|(c, _)| *c).collect())
+                    .collect(),
                 current_guess: self.current_guess,
                 is_guessing: self.is_guessing,
                 is_winner: self.is_winner,
@@ -456,7 +471,6 @@ impl State {
 
         self.is_winner = self.is_correct_word();
         self.submit_current_guess();
-    
         if self.is_game_ended() {
             self.is_guessing = false;
 
@@ -534,7 +548,6 @@ impl State {
         self.discovered_counts = std::iter::repeat(HashMap::new())
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
-        self.discovered_characters = HashSet::new();
 
         if previous_word.len() == self.word_length
             && self.is_winner
@@ -544,7 +557,12 @@ impl State {
                 .take(self.max_guesses - 1)
                 .collect::<Vec<_>>();
 
-            self.guesses.push(previous_word.iter().map(|c| (*c, TileState::Unknown)).collect());
+            self.guesses.push(
+                previous_word
+                    .iter()
+                    .map(|c| (*c, TileState::Unknown))
+                    .collect(),
+            );
             self.guesses.extend(empty_guesses);
 
             self.current_guess = 0;
@@ -560,14 +578,14 @@ impl State {
         self.is_guessing = true;
         self.is_winner = false;
         self.is_reset = true;
-        
         self.clear_message();
 
         if self.game_mode == GameMode::DailyWord {
             let today = Local::now().naive_local().date();
             if let Some(solve) = self.daily_word_history.get(&today).cloned() {
                 for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                    self.guesses[guess_index] = guess.iter().map(|c| (*c, TileState::Unknown)).collect();
+                    self.guesses[guess_index] =
+                        guess.iter().map(|c| (*c, TileState::Unknown)).collect();
                     self.current_guess = guess_index;
                     self.submit_current_guess();
                 }
@@ -715,7 +733,8 @@ impl State {
         let today = Local::now().naive_local().date();
         if let Some(solve) = self.daily_word_history.get(&today).cloned() {
             for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                self.guesses[guess_index] = guess.iter().map(|c| (*c, TileState::Unknown)).collect();
+                self.guesses[guess_index] =
+                    guess.iter().map(|c| (*c, TileState::Unknown)).collect();
                 self.current_guess = guess_index;
                 self.submit_current_guess();
             }
@@ -766,7 +785,9 @@ impl State {
 
             let guesses_item = local_storage.get_item("guesses")?;
             if let Some(guesses_str) = guesses_item {
-                let previous_guesses = guesses_str.split(',').map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
+                let previous_guesses = guesses_str
+                    .split(',')
+                    .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
 
                 for (guess_index, guess) in previous_guesses.enumerate() {
                     self.guesses[guess_index] = guess;
