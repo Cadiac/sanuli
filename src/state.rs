@@ -91,6 +91,12 @@ pub struct DailyWordHistory {
 }
 
 #[derive(Clone, PartialEq)]
+pub enum CharacterCount {
+    AtLeast(usize),
+    Exactly(usize),
+}
+
+#[derive(Clone, PartialEq)]
 pub struct State {
     pub word_list: Vec<Vec<char>>,
     pub word: Vec<char>,
@@ -113,7 +119,7 @@ pub struct State {
     pub message: String,
 
     pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
-    pub known_at_least_counts: Vec<HashMap<char, usize>>,
+    pub discovered_counts: Vec<HashMap<char, CharacterCount>>,
     pub discovered_characters: HashSet<char>,
 
     pub guesses: Vec<Vec<(char, TileState)>>,
@@ -138,7 +144,7 @@ impl State {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let known_at_least_counts = std::iter::repeat(HashMap::new())
+        let discovered_counts = std::iter::repeat(HashMap::new())
             .take(max_guesses)
             .collect::<Vec<_>>();
 
@@ -164,7 +170,7 @@ impl State {
             message: EMPTY.to_string(),
 
             known_states,
-            known_at_least_counts,
+            discovered_counts,
             discovered_characters: HashSet::new(),
 
             guesses,
@@ -186,7 +192,7 @@ impl State {
         }
 
         let is_count_unknown =
-            !self.known_at_least_counts[self.current_guess].contains_key(key);
+            !self.discovered_counts[self.current_guess].contains_key(key);
 
         let is_absent = is_count_unknown
             && self.known_states[self.current_guess]
@@ -211,7 +217,7 @@ impl State {
                 return TileState::Absent;
             }
             _ => {
-                let is_count_unknown = !self.known_at_least_counts[self.current_guess]
+                let is_count_unknown = !self.discovered_counts[self.current_guess]
                     .contains_key(&character);
 
                 let is_absent = is_count_unknown
@@ -232,7 +238,7 @@ impl State {
         }
     }
 
-    fn update_row_tiles(&mut self, row: usize) {
+    fn reveal_row_tiles(&mut self, row: usize) {
         if let Some(guess) = self.guesses.get_mut(row) {
             let mut revealed_count_on_row: HashMap<char, usize> = HashMap::with_capacity(self.word_length);
 
@@ -258,14 +264,18 @@ impl State {
                             .and_modify(|count| *count += 1)
                             .or_insert(1);
 
-                        let at_least = self.known_at_least_counts[row]
+                        let discovered_count = self.discovered_counts[row]
                             .get(character)
-                            .unwrap_or(&0);
+                            .unwrap_or(&CharacterCount::AtLeast(0));
 
-                        if *revealed <= *at_least {
-                            *tile_state = TileState::Present;
-                        } else {
-                            *tile_state = TileState::Absent;
+                        match discovered_count {
+                            CharacterCount::AtLeast(count) | CharacterCount::Exactly(count) => {
+                                if *revealed <= *count {
+                                    *tile_state = TileState::Present;
+                                } else {
+                                    *tile_state = TileState::Absent;
+                                }
+                            }
                         }
                     }
                     _ => {
@@ -289,21 +299,35 @@ impl State {
                 *known = CharacterState::Absent;
 
                 if self.word.contains(character) {
-                    let at_least = self.known_at_least_counts[self.current_guess]
+                    let discovered_count = self.discovered_counts[self.current_guess]
                         .entry(*character)
-                        .or_insert(0);
-                    // At least the same amount of characters as in the word are highlighted
+                        .or_insert(CharacterCount::AtLeast(0));
+
+                    // At most the same amount of characters as in the word are highlighted
                     let count_in_word = self.word.iter().filter(|c| *c == character).count();
                     let count_in_guess = self.guesses[self.current_guess]
                         .iter()
                         .filter(|(c, _)| c == character)
                         .count();
-                    if count_in_guess >= count_in_word {
-                        if count_in_word > *at_least {
-                            *at_least = count_in_word;
+
+                    match discovered_count {
+                        CharacterCount::AtLeast(count) => {
+                            if count_in_guess > count_in_word {
+                                if count_in_word >= *count {
+                                    // The guess had more copies of the character than the word,
+                                    // the exact count is revealed
+                                    *discovered_count = CharacterCount::Exactly(count_in_word);
+                                }
+                            } else if count_in_guess == count_in_word {
+                                // The count had the exact count but that isn't revealed yet
+                                *discovered_count = CharacterCount::AtLeast(count_in_guess);
+                            } else if count_in_guess > *count {
+                                // Found more, but the exact count is still unknown
+                                *discovered_count = CharacterCount::AtLeast(count_in_guess);
+                            }
                         }
-                    } else if count_in_guess > *at_least {
-                        *at_least = count_in_guess;
+                        // Exact count should never change
+                        CharacterCount::Exactly(_) => {}
                     }
 
                     self.discovered_characters.insert(*character);
@@ -315,11 +339,11 @@ impl State {
         if self.current_guess < self.max_guesses - 1 {
             let next = self.current_guess + 1;
             self.known_states[next] = self.known_states[self.current_guess].clone();
-            self.known_at_least_counts[next] =
-                self.known_at_least_counts[self.current_guess].clone();
+            self.discovered_counts[next] =
+                self.discovered_counts[self.current_guess].clone();
         }
 
-        self.update_row_tiles(self.current_guess);
+        self.reveal_row_tiles(self.current_guess);
     }
 
     pub fn push_character(&mut self, character: char) -> bool {
@@ -507,7 +531,7 @@ impl State {
         self.known_states = std::iter::repeat(HashMap::new())
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
-        self.known_at_least_counts = std::iter::repeat(HashMap::new())
+        self.discovered_counts = std::iter::repeat(HashMap::new())
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
         self.discovered_characters = HashSet::new();
