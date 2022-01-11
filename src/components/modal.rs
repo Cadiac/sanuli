@@ -150,7 +150,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.game_mode == GameMode::TimeAttack).then(|| Some("select-active")))}
                         onclick={change_game_mode_time_attack}>
                         {"Nopeuspeli"}
                     </button>

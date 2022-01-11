@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+
+use yew::prelude::*;
+
+use gloo_timers::callback::Timeout;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
-use yew::prelude::*;
 
 mod components;
 mod state;
@@ -26,6 +29,7 @@ pub enum Msg {
     Enter,
     Guess,
     NewGame,
+    LoseGame,
     ToggleHelp,
     ToggleMenu,
     ChangeGameMode(GameMode),
@@ -41,6 +45,7 @@ pub struct App {
     is_help_visible: bool,
     is_menu_visible: bool,
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
+    timeout: Option<Timeout>
 }
 
 impl Component for App {
@@ -53,6 +58,7 @@ impl Component for App {
             is_help_visible: false,
             is_menu_visible: false,
             keyboard_listener: None,
+            timeout: None,
         };
 
         if initial_state.state.rehydrate().is_err() {
@@ -130,7 +136,41 @@ impl Component for App {
                 true
             }
             Msg::Guess => self.state.submit_guess(),
-            Msg::NewGame => self.state.create_new_game(),
+            Msg::NewGame => {
+                if self.state.game_mode == GameMode::TimeAttack {
+                    if let Some(timeout) = self.timeout.take() {
+                        timeout.cancel();
+                    }
+    
+                    if self.state.is_winner && self.state.time_attack.is_some() {
+                        self.state.time_attack.as_mut().unwrap().next_round();
+                    } else {
+                        self.state.time_attack = Some(state::TimeAttack::new())
+                    }
+    
+                    self.state.create_new_game();
+    
+                    let link = ctx.link().clone();
+                    let duration = self.state.time_attack.as_ref().unwrap().duration;
+    
+                    self.timeout = Some(
+                        Timeout::new(1_000 * duration, move || {
+                            link.send_message(Msg::LoseGame)
+                        }),
+                    );    
+                } else {
+                    self.state.create_new_game();
+                }
+
+                true
+            }
+            Msg::LoseGame => {
+                if let Some(timeout) = self.timeout.take() {
+                    timeout.cancel();
+                }
+
+                self.state.lose_game_timed()
+            }
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
@@ -213,9 +253,12 @@ impl Component for App {
 
                 {
                     if self.state.game_mode == GameMode::TimeAttack {
-                        let time_attack = self.state.time_attack.as_ref().unwrap();
-                        html! {
-                            <Timer duration={time_attack.duration} is_paused={!self.state.is_guessing} />
+                        if let Some(time_attack) = self.state.time_attack.as_ref() {
+                            html! {
+                                <Timer duration={time_attack.duration} is_paused={!self.state.is_guessing} />
+                            }
+                        } else {
+                            html! {}
                         }
                     } else {
                         html! {}

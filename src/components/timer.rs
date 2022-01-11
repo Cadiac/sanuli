@@ -7,7 +7,7 @@ pub struct Timer {}
 #[derive(Properties, PartialEq)]
 pub struct Props {
     /// The link must have a target.
-    pub duration: usize,
+    pub duration: u32,
     pub is_paused: bool,
 }
 

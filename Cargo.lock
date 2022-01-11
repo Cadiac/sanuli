@@ -342,6 +342,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "getrandom",
+ "gloo-timers",
  "rand",
  "serde_scan",
  "wasm-bindgen",

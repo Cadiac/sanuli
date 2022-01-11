@@ -185,9 +185,36 @@ pub enum CharacterCount {
 
 #[derive(Clone, PartialEq)]
 pub struct TimeAttack {
-    pub round: usize,
-    pub start_time: DateTime<Utc>,
-    pub duration: usize,
+    pub round: u32,
+    pub duration: u32,
+}
+
+// impl PartialEq for TimeAttack {
+//     fn eq(&self, other: &Self) -> bool {
+//         if self.round != other.round || self.duration != other.duration {
+//             return false;
+//         }
+
+//         if self.timeout.is_some() && other.timeout.is_some() {
+//             return Rc::ptr_eq(&self.timeout.unwrap(), &other.timeout.unwrap());
+//         } else {
+//             return self.timeout.is_none() && other.timeout.is_none();
+//         }
+//     }
+// }
+
+impl TimeAttack {
+    pub fn new() -> Self {
+        Self {
+            round: 1,
+            duration: 20,
+        }
+    }
+
+    pub fn next_round(&mut self) {
+        self.round += 1;
+        self.duration = 60 - (self.round - 1) * 5;
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -227,7 +254,7 @@ pub struct State {
     pub total_played: usize,
     pub total_solved: usize,
 
-    pub time_attack: Option<TimeAttack>
+    pub time_attack: Option<TimeAttack>,
 }
 
 impl State {
@@ -607,9 +634,33 @@ impl State {
             self.set_daily_word_history(&today);
 
             let _result = self.persist_single_daily_word(&today);
+        } else if self.game_mode == GameMode::TimeAttack {
+            // if let Some(timeout) = self.time_attack.unwrap().timeout.take() {
+            //     timeout.borrow_mut().cancel();
+            // }
+
+            let _result = self.persist_game();
         } else {
             let _result = self.persist_game();
         }
+
+        true
+    }
+
+    pub fn lose_game_timed(&mut self) -> bool {
+        // TODO: Support winning if timer runs out and the
+        // correct word was written?
+
+        self.is_reset = false;
+        self.is_winner = false;
+        self.is_guessing = false;
+
+        self.clear_message();
+
+        self.set_game_statistics();
+        self.set_game_end_message();
+
+        let _result = self.persist_game();
 
         true
     }
@@ -763,11 +814,7 @@ impl State {
         if self.game_mode == GameMode::DailyWord {
             self.word_length = 5;
         } else if self.game_mode == GameMode::TimeAttack {
-            self.time_attack = Some(TimeAttack {
-                round: 1,
-                start_time: Utc::now(),
-                duration: 60,
-            });
+            self.time_attack = Some(TimeAttack::new());
         }
     }
 
