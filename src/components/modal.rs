@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::state::GameMode;
+use crate::state::{GameMode, WordList};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
@@ -57,6 +57,7 @@ pub struct MenuModalProps {
     pub callback: Callback<Msg>,
     pub word_length: usize,
     pub game_mode: GameMode,
+    pub word_list: WordList,
 }
 
 #[function_component(MenuModal)]
@@ -97,6 +98,18 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
         callback.emit(Msg::ChangeGameMode(GameMode::DailyWord));
     });
 
+    let callback = props.callback.clone();
+    let change_word_list_full = Callback::from(move |e: MouseEvent| {
+        e.prevent_default();
+        callback.emit(Msg::ChangeWordList(WordList::Full));
+    });
+
+    let callback = props.callback.clone();
+    let change_word_list_common = Callback::from(move |e: MouseEvent| {
+        e.prevent_default();
+        callback.emit(Msg::ChangeWordList(WordList::Common));
+    });
+
     html! {
         <div class="modal">
             <span onmousedown={toggle_menu} class="modal-close">{"✖"}</span>
@@ -127,6 +140,19 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="label">{"Sanulista:"}</label>
+                <div class="select-container">
+                    <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
+                        onmousedown={change_word_list_common}>
+                        {"Yleiset"}
+                    </button>
+                    <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
+                        onmousedown={change_word_list_full}>
+                        {"Kaikki"}
                     </button>
                 </div>
             </div>

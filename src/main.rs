@@ -12,7 +12,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use state::{GameMode, State, TileState};
+use state::{GameMode, State, TileState, WordList};
 
 const ALLOWED_KEYS: [char; 29] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
@@ -30,6 +30,7 @@ pub enum Msg {
     ChangeGameMode(GameMode),
     ChangePreviousGameMode,
     ChangeWordLength(usize),
+    ChangeWordList(WordList),
 }
 
 pub struct App {
@@ -143,15 +144,12 @@ impl Component for App {
                 self.is_help_visible = false;
                 self.state.create_new_game()
             }
-            Msg::ChangeGameMode(new_mode) => {
-                self.state.change_game_mode(new_mode);
+            Msg::ChangeGameMode(new_mode) => self.state.change_game_mode(new_mode),
+            Msg::ChangePreviousGameMode => self.state.change_game_mode(self.state.previous_game_mode.clone()),
+            Msg::ChangeWordList(list) => {
+                self.state.change_word_list(list);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                self.state.create_new_game()
-            }
-            Msg::ChangePreviousGameMode => {
-                self.state
-                    .change_game_mode(self.state.previous_game_mode.clone());
                 self.state.create_new_game()
             }
         }
@@ -219,6 +217,7 @@ impl Component for App {
                                 callback={link.callback(move |msg| msg)}
                                 game_mode={self.state.game_mode}
                                 word_length={self.state.word_length}
+                                word_list={self.state.word_list}
                             />
                         }
                     } else {
