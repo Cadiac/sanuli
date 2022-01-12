@@ -168,9 +168,9 @@ pub struct State {
 
 impl State {
     pub fn new(word_length: usize, max_guesses: usize) -> Self {
-        let word_list = WordList::Common;
+        let word_list = WordList::Full;
         let full_word_list = parse_words(WordList::Full, word_length);
-        let current_word_list = parse_words(WordList::Common, word_length);
+        let current_word_list = parse_words(WordList::Full, word_length);
 
         let word = current_word_list.choose(&mut rand::thread_rng()).unwrap().clone();
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
