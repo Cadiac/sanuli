@@ -48,10 +48,13 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
     
             <p>
-                {"Käytetyn sanalistan pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
+                {"Arvattaviin sanoihin käytetyn sanalistan voi valita asetuksista. Molempien sanalistojen pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Sanat ovat enimmäkseen perusmuodossa. "}
-                {"Sanalistaa muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuihin "}
+                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Suppealla listalla on näistä
+                karsittu harvinaisemmat laina- ja murressanat, sekä muut erikoisuudet. Sanat ovat enimmäkseen perusmuodossa."}
+            </p>
+            <p>
+                {"Sanalistoja muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {"."}
             </p>
