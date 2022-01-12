@@ -2,5 +2,8 @@
 dist
 vendor
 word-list.txt
-daily-words.txt
 .DS_Store
+
+common-words.txt
+full-words.txt
+daily-words.txt

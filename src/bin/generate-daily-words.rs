@@ -1,7 +1,7 @@
 use std::fs;
 use rand::prelude::SliceRandom;
 
-const WORDS: &str = include_str!("../../word-list.txt");
+const WORDS: &str = include_str!("../../full-words.txt");
 
 fn get_random_word(word_list: &Vec<String>) -> String {
     word_list

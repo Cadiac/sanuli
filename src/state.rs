@@ -8,19 +8,52 @@ use chrono::{Local, NaiveDate};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-const WORDS: &str = include_str!("../word-list.txt");
+const FULL_WORDS: &str = include_str!("../full-words.txt");
+const COMMON_WORDS: &str = include_str!("../common-words.txt");
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
 const EMPTY: char = '\u{00a0}'; // &nbsp;
 const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 
-fn parse_words(words: &str, word_length: usize) -> Vec<Vec<char>> {
+fn parse_words(word_list: WordList, word_length: usize) -> Vec<Vec<char>> {
+    let words = match word_list {
+        WordList::Full => FULL_WORDS,
+        WordList::Common => COMMON_WORDS
+    };
+
     words
         .lines()
         .filter(|word| word.chars().count() == word_length)
         .map(|word| word.chars().collect())
         .collect()
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum WordList {
+    Full,
+    Common,
+}
+
+impl FromStr for WordList {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WordList, Self::Err> {
+        match input {
+            "full" => Ok(WordList::Full),
+            "common" => Ok(WordList::Common),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for WordList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WordList::Full => write!(f, "full"),
+            WordList::Common => write!(f, "common"),
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -97,8 +130,11 @@ pub enum CharacterCount {
 
 #[derive(Clone, PartialEq)]
 pub struct State {
-    pub word_list: Vec<Vec<char>>,
     pub word: Vec<char>,
+
+    pub word_list: WordList,
+    pub current_word_list: Vec<Vec<char>>,
+    pub full_word_list: Vec<Vec<char>>,
 
     pub word_length: usize,
     pub max_guesses: usize,
@@ -132,8 +168,11 @@ pub struct State {
 
 impl State {
     pub fn new(word_length: usize, max_guesses: usize) -> Self {
-        let word_list = parse_words(WORDS, word_length);
-        let word = word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        let word_list = WordList::Common;
+        let full_word_list = parse_words(WordList::Full, word_length);
+        let current_word_list = parse_words(WordList::Common, word_length);
+
+        let word = current_word_list.choose(&mut rand::thread_rng()).unwrap().clone();
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
             .take(max_guesses)
             .collect::<Vec<_>>();
@@ -148,7 +187,10 @@ impl State {
 
         Self {
             word,
+
             word_list,
+            full_word_list,
+            current_word_list,
 
             word_length,
             max_guesses,
@@ -375,7 +417,7 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        self.word_list.contains(
+        self.full_word_list.contains(
             &self.guesses[self.current_guess]
                 .iter()
                 .map(|(c, _)| *c)
@@ -493,7 +535,8 @@ impl State {
     }
 
     pub fn get_random_word(&self) -> Vec<char> {
-        self.word_list
+        // TODO: No need to keep parsed list in memory, just pick one line from the string?
+        self.current_word_list
             .choose(&mut rand::thread_rng())
             .unwrap()
             .clone()
@@ -604,7 +647,9 @@ impl State {
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.word_length = new_length;
-        self.word_list = parse_words(WORDS, self.word_length);
+        self.full_word_list = parse_words(self.word_list, self.word_length);
+        self.current_word_list = parse_words(self.word_list, self.word_length);
+
         // TODO: Store streaks for every word length separately
         self.streak = 0;
         self.is_menu_visible = false;
@@ -614,16 +659,32 @@ impl State {
         }
     }
 
-    pub fn change_game_mode(&mut self, new_mode: GameMode) {
+    pub fn change_game_mode(&mut self, new_mode: GameMode) -> bool {
         self.previous_game_mode = std::mem::replace(&mut self.game_mode, new_mode);
         self.is_menu_visible = false;
         self.message = EMPTY.to_string();
         let _result = self.persist_settings();
 
         if self.game_mode == GameMode::DailyWord {
-            self.word_list = parse_words(WORDS, 5);
+            self.current_word_list = parse_words(WordList::Full, 5);
             self.word_length = 5;
         }
+
+        self.is_menu_visible = false;
+        self.is_help_visible = false;
+        self.create_new_game()
+    }
+
+    pub fn change_word_list(&mut self, new_list: WordList) -> bool {
+        self.word_list = new_list;
+        self.current_word_list = parse_words(self.word_list, self.word_length);
+        self.is_menu_visible = false;
+        self.message = EMPTY.to_string();
+        let _result = self.persist_settings();
+
+        self.is_menu_visible = false;
+        self.is_help_visible = false;
+        self.create_new_game()
     }
 
     // Persisting & restoring game state
@@ -634,6 +695,7 @@ impl State {
         if let Some(local_storage) = local_storage {
             local_storage.set_item("game_mode", &self.game_mode.to_string())?;
             local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
+            local_storage.set_item("word_list", format!("{}", self.word_list).as_str())?;
         }
 
         Ok(())
@@ -723,10 +785,8 @@ impl State {
 
     fn rehydrate_daily_word(&mut self) {
         self.word = self.get_daily_word();
-        if self.word.len() != self.word_length {
-            self.word_length = self.word.len();
-            self.word_list = parse_words(WORDS, self.word_length);
-        }
+        self.word_length = self.word.len();
+        self.current_word_list = parse_words(WordList::Full, self.word_length);
 
         let today = Local::now().naive_local().date();
         if let Some(solve) = self.daily_word_history.get(&today).cloned() {
@@ -751,11 +811,18 @@ impl State {
     fn rehydrate_game(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage().expect("local storage not available") {
+            let word_list_item = local_storage.get_item("word_list")?;
+            if let Some(word_list_str) = word_list_item {
+                if let Ok(word_list) = word_list_str.parse::<WordList>() {
+                    self.word_list = word_list;
+                }
+            }
+
             let word_length_item = local_storage.get_item("word_length")?;
             if let Some(word_length_str) = word_length_item {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     if word_length != self.word_length {
-                        self.word_list = parse_words(WORDS, word_length);
+                        self.current_word_list = parse_words(self.word_list, word_length);
                     }
                     self.word_length = word_length;
                 }
