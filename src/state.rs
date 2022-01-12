@@ -647,7 +647,7 @@ impl State {
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.word_length = new_length;
-        self.full_word_list = parse_words(self.word_list, self.word_length);
+        self.full_word_list = parse_words(WordList::Full, self.word_length);
         self.current_word_list = parse_words(self.word_list, self.word_length);
 
         // TODO: Store streaks for every word length separately
@@ -666,6 +666,7 @@ impl State {
         let _result = self.persist_settings();
 
         if self.game_mode == GameMode::DailyWord {
+            self.full_word_list = parse_words(WordList::Full, 5);
             self.current_word_list = parse_words(WordList::Full, 5);
             self.word_length = 5;
         }
@@ -786,6 +787,7 @@ impl State {
     fn rehydrate_daily_word(&mut self) {
         self.word = self.get_daily_word();
         self.word_length = self.word.len();
+        self.full_word_list = parse_words(WordList::Full, self.word_length);
         self.current_word_list = parse_words(WordList::Full, self.word_length);
 
         let today = Local::now().naive_local().date();
@@ -822,6 +824,7 @@ impl State {
             if let Some(word_length_str) = word_length_item {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     if word_length != self.word_length {
+                        self.full_word_list = parse_words(WordList::Full, word_length);
                         self.current_word_list = parse_words(self.word_list, word_length);
                     }
                     self.word_length = word_length;
