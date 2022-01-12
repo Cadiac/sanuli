@@ -97,6 +97,19 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 </div>
             </div>
             <div>
+                <label class="label">{"Sanulista:"}</label>
+                <div class="select-container">
+                    <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
+                        onmousedown={change_word_list_full}>
+                        {"Kaikki"}
+                    </button>
+                    <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
+                        onmousedown={change_word_list_common}>
+                        {"Suppea"}
+                    </button>
+                </div>
+            </div>
+            <div>
                 <label class="label">{"Pelimuoto:"}</label>
                 <div class="select-container">
                     <button class={classes!("select", (props.game_mode == GameMode::Classic).then(|| Some("select-active")))}
@@ -110,19 +123,6 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="label">{"Sanulista:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_full}>
-                        {"Kaikki"}
-                    </button>
-                    <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_common}>
-                        {"Suppea"}
                     </button>
                 </div>
             </div>
