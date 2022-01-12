@@ -7,6 +7,18 @@ const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQL
 const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
 const VERSION: &str = "v1.1";
 
+macro_rules! onmousedown {
+    ( $cb:ident, $msg:expr ) => {
+        {
+            let $cb = $cb.clone();
+            Callback::from(move |e: MouseEvent| {
+                e.prevent_default();
+                $cb.emit($msg);
+            })
+        }
+    };
+}
+
 #[derive(Properties, Clone, PartialEq)]
 pub struct HelpModalProps {
     pub callback: Callback<Msg>
@@ -15,12 +27,7 @@ pub struct HelpModalProps {
 #[function_component(HelpModal)]
 pub fn help_modal(props: &HelpModalProps) -> Html {
     let callback = props.callback.clone();
-    let toggle_help = {
-        Callback::from(move |e: MouseEvent| {
-            e.prevent_default();
-            callback.emit(Msg::ToggleHelp);
-        })
-    };
+    let toggle_help = onmousedown!(callback, Msg::ToggleHelp);
 
     html! {
         <div class="modal">
@@ -63,52 +70,15 @@ pub struct MenuModalProps {
 #[function_component(MenuModal)]
 pub fn menu_modal(props: &MenuModalProps) -> Html {
     let callback = props.callback.clone();
-    let toggle_menu = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ToggleMenu);
-    });
 
-    let callback = props.callback.clone();
-    let change_word_length_5 = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeWordLength(5));
-    });
-
-    let callback = props.callback.clone();
-    let change_word_length_6 = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeWordLength(6));
-    });
-
-    let callback = props.callback.clone();
-    let change_game_mode_classic = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeGameMode(GameMode::Classic));
-    });
-
-    let callback = props.callback.clone();
-    let change_game_mode_relay = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeGameMode(GameMode::Relay));
-    });
-
-    let callback = props.callback.clone();
-    let change_game_mode_daily = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeGameMode(GameMode::DailyWord));
-    });
-
-    let callback = props.callback.clone();
-    let change_word_list_full = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeWordList(WordList::Full));
-    });
-
-    let callback = props.callback.clone();
-    let change_word_list_common = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::ChangeWordList(WordList::Common));
-    });
+    let toggle_menu = onmousedown!(callback, Msg::ToggleMenu);
+    let change_word_length_5 = onmousedown!(callback, Msg::ChangeWordLength(5));
+    let change_word_length_6 = onmousedown!(callback, Msg::ChangeWordLength(6));
+    let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
+    let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
+    let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord));
+    let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
+    let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
 
     html! {
         <div class="modal">
