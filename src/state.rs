@@ -647,7 +647,9 @@ impl State {
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.word_length = new_length;
+        self.full_word_list = parse_words(self.word_list, self.word_length);
         self.current_word_list = parse_words(self.word_list, self.word_length);
+
         // TODO: Store streaks for every word length separately
         self.streak = 0;
         self.is_menu_visible = false;

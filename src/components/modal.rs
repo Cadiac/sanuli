@@ -118,7 +118,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 <div class="select-container">
                     <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
                         onmousedown={change_word_list_common}>
-                        {"Yleiset"}
+                        {"Suppea"}
                     </button>
                     <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
                         onmousedown={change_word_list_full}>
