@@ -50,7 +50,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p>
                 {"Arvattaviin sanoihin käytetyn sanalistan voi valita asetuksista. Molempien sanalistojen pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Helpolla listalla on näistä
+                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Suppealla listalla on näistä
                 karsittu harvinaisemmat laina- ja murressanat, sekä muut erikoisuudet. Sanat ovat enimmäkseen perusmuodossa."}
             </p>
             <p>
@@ -104,11 +104,11 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 <div class="select-container">
                     <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
                         onmousedown={change_word_list_common}>
-                        {"Helppo"}
+                        {"Suppea"}
                     </button>
                     <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
                         onmousedown={change_word_list_full}>
-                        {"Vaikea"}
+                        {"Laaja"}
                     </button>
                 </div>
             </div>
