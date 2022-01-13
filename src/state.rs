@@ -1,5 +1,6 @@
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 use std::mem;
 use std::str::FromStr;
@@ -15,6 +16,18 @@ const EMPTY: char = '\u{00a0}'; // &nbsp;
 const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
+
+fn parse_all_words() -> HashMap<usize, HashSet<Vec<char>>> {
+    let mut words = HashMap::with_capacity(2);
+    
+    for word in FULL_WORDS.lines() {
+        let chars = word.chars();
+        let word_length = chars.clone().count();
+        words.entry(word_length).or_insert(HashSet::new()).insert(chars.collect());
+    }
+
+    words
+}
 
 fn parse_words(word_list: WordList, word_length: usize) -> Vec<Vec<char>> {
     let words = match word_list {
@@ -134,7 +147,7 @@ pub struct State {
 
     pub word_list: WordList,
     pub current_word_list: Vec<Vec<char>>,
-    pub full_word_list: Vec<Vec<char>>,
+    pub full_word_list: HashMap<usize, HashSet<Vec<char>>>,
 
     pub word_length: usize,
     pub max_guesses: usize,
@@ -167,7 +180,7 @@ pub struct State {
 impl State {
     pub fn new(word_length: usize, max_guesses: usize) -> Self {
         let word_list = WordList::Common;
-        let full_word_list = parse_words(WordList::Full, word_length);
+        let full_word_list = parse_all_words();
         let current_word_list = parse_words(word_list, word_length);
 
         let word = current_word_list.choose(&mut rand::thread_rng()).unwrap().clone();
@@ -413,12 +426,17 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        self.full_word_list.contains(
-            &self.guesses[self.current_guess]
-                .iter()
-                .map(|(c, _)| *c)
-                .collect(),
-        )
+        match self.full_word_list.get(&self.word_length) {
+            Some(list) => {
+                let word: &Vec<char> = &self.guesses[self.current_guess]
+                    .iter()
+                    .map(|(c, _)| *c)
+                    .collect();
+
+                return list.contains(word)
+            }
+            None => false
+        }
     }
 
     fn is_correct_word(&self) -> bool {
@@ -643,7 +661,6 @@ impl State {
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.word_length = new_length;
-        self.full_word_list = parse_words(WordList::Full, self.word_length);
         self.current_word_list = parse_words(self.word_list, self.word_length);
 
         // TODO: Store streaks for every word length separately
@@ -660,7 +677,6 @@ impl State {
         let _result = self.persist_settings();
 
         if self.game_mode == GameMode::DailyWord {
-            self.full_word_list = parse_words(WordList::Full, 5);
             self.current_word_list = parse_words(WordList::Full, 5);
             self.word_length = 5;
         }
@@ -773,7 +789,6 @@ impl State {
     fn rehydrate_daily_word(&mut self) {
         self.word = self.get_daily_word();
         self.word_length = self.word.len();
-        self.full_word_list = parse_words(WordList::Full, self.word_length);
         self.current_word_list = parse_words(WordList::Full, self.word_length);
 
         let today = Local::now().naive_local().date();
@@ -810,7 +825,6 @@ impl State {
             if let Some(word_length_str) = word_length_item {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     if word_length != self.word_length {
-                        self.full_word_list = parse_words(WordList::Full, word_length);
                         self.current_word_list = parse_words(self.word_list, word_length);
                     }
                     self.word_length = word_length;

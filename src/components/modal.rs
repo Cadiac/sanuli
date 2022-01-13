@@ -5,7 +5,7 @@ use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
-const VERSION: &str = "v1.2";
+const VERSION: &str = "v1.3";
 
 macro_rules! onmousedown {
     ( $cb:ident, $msg:expr ) => {
@@ -50,7 +50,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p>
                 {"Arvattaviin sanoihin käytetyn sanalistan voi valita asetuksista. Molempien sanalistojen pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Suppealla listalla on näistä
+                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Helpolla listalla on näistä
                 karsittu harvinaisemmat laina- ja murressanat, sekä muut erikoisuudet. Sanat ovat enimmäkseen perusmuodossa."}
             </p>
             <p>
@@ -104,11 +104,11 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 <div class="select-container">
                     <button class={classes!("select", (props.word_list == WordList::Common).then(|| Some("select-active")))}
                         onmousedown={change_word_list_common}>
-                        {"Suppea"}
+                        {"Helppo"}
                     </button>
                     <button class={classes!("select", (props.word_list == WordList::Full).then(|| Some("select-active")))}
                         onmousedown={change_word_list_full}>
-                        {"Kaikki"}
+                        {"Vaikea"}
                     </button>
                 </div>
             </div>
