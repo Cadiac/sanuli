@@ -143,8 +143,6 @@ pub struct State {
     pub is_winner: bool,
     pub is_unknown: bool,
     pub is_reset: bool,
-    pub is_help_visible: bool,
-    pub is_menu_visible: bool,
 
     pub daily_word_history: HashMap<NaiveDate, DailyWordHistory>,
 
@@ -168,9 +166,9 @@ pub struct State {
 
 impl State {
     pub fn new(word_length: usize, max_guesses: usize) -> Self {
-        let word_list = WordList::Full;
+        let word_list = WordList::Common;
         let full_word_list = parse_words(WordList::Full, word_length);
-        let current_word_list = parse_words(WordList::Full, word_length);
+        let current_word_list = parse_words(word_list, word_length);
 
         let word = current_word_list.choose(&mut rand::thread_rng()).unwrap().clone();
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
@@ -199,8 +197,6 @@ impl State {
             is_winner: false,
             is_unknown: false,
             is_reset: false,
-            is_menu_visible: false,
-            is_help_visible: false,
 
             daily_word_history: HashMap::new(),
 
@@ -535,7 +531,7 @@ impl State {
     }
 
     pub fn get_random_word(&self) -> Vec<char> {
-        // TODO: No need to keep parsed list in memory, just pick one line from the string?
+        // TODO: No need to keep the full parsed list in memory, just pick one with correct length from string?
         self.current_word_list
             .choose(&mut rand::thread_rng())
             .unwrap()
@@ -652,16 +648,14 @@ impl State {
 
         // TODO: Store streaks for every word length separately
         self.streak = 0;
-        self.is_menu_visible = false;
 
         if self.game_mode == GameMode::DailyWord {
             self.game_mode = GameMode::Classic;
         }
     }
 
-    pub fn change_game_mode(&mut self, new_mode: GameMode) -> bool {
+    pub fn change_game_mode(&mut self, new_mode: GameMode) {
         self.previous_game_mode = std::mem::replace(&mut self.game_mode, new_mode);
-        self.is_menu_visible = false;
         self.message = EMPTY.to_string();
         let _result = self.persist_settings();
 
@@ -670,22 +664,14 @@ impl State {
             self.current_word_list = parse_words(WordList::Full, 5);
             self.word_length = 5;
         }
-
-        self.is_menu_visible = false;
-        self.is_help_visible = false;
-        self.create_new_game()
     }
 
-    pub fn change_word_list(&mut self, new_list: WordList) -> bool {
+    pub fn change_word_list(&mut self, new_list: WordList) {
         self.word_list = new_list;
         self.current_word_list = parse_words(self.word_list, self.word_length);
-        self.is_menu_visible = false;
         self.message = EMPTY.to_string();
+        self.streak = 0;
         let _result = self.persist_settings();
-
-        self.is_menu_visible = false;
-        self.is_help_visible = false;
-        self.create_new_game()
     }
 
     // Persisting & restoring game state

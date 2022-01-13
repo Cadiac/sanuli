@@ -144,8 +144,16 @@ impl Component for App {
                 self.is_help_visible = false;
                 self.state.create_new_game()
             }
-            Msg::ChangeGameMode(new_mode) => self.state.change_game_mode(new_mode),
-            Msg::ChangePreviousGameMode => self.state.change_game_mode(self.state.previous_game_mode.clone()),
+            Msg::ChangeGameMode(new_mode) => {
+                self.state.change_game_mode(new_mode);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
+                self.state.create_new_game()
+            },
+            Msg::ChangePreviousGameMode => {
+                self.state.change_game_mode(self.state.previous_game_mode.clone());
+                self.state.create_new_game()
+            },
             Msg::ChangeWordList(list) => {
                 self.state.change_word_list(list);
                 self.is_menu_visible = false;
