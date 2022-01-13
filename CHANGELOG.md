@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 ## v1.2 - 2022-01-11
 
 ### Added
-- Added a setting which changes the pool of words to guess from to a smaller hand picked list. This word list should contain less strange unused / dialect words. Guesses can still be submitted from the full list. For 6 character mode the common words list is still mostly unchanged, but is coming soon.
+- Added a setting which changes the pool of words to guess from to a smaller hand picked list. This word list should contain less strange unused / dialect words. Guesses can still be submitted from the full list. For 6 character mode the common words list is ~~still mostly unchanged~~ complete.
 - The default word list is still the full list, but this setting is persisted
 
 ### Changed
