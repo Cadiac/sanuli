@@ -54,6 +54,9 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 karsittu harvinaisemmat laina- ja murressanat, sekä muut erikoisuudet. Sanat ovat enimmäkseen perusmuodossa."}
             </p>
             <p>
+                {"Päivän sanulin sanat tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla sama kaikille pelaajille tiettynä päivänä."}
+            </p>
+            <p>
                 {"Sanalistoja muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {"."}
