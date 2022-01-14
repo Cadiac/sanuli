@@ -16,16 +16,38 @@ Follow [Rust](https://www.rust-lang.org/en-US/install.html) installation instruc
 To build the WASM based [yew](https://yew.rs/) UI, further wasm tooling is required
 
 ```
-rustup target add wasm32-unknown-unknown
-cargo install --locked trunk
-cargo install wasm-bindgen-cli
+$ rustup target add wasm32-unknown-unknown
+$ cargo install --locked trunk
+$ cargo install wasm-bindgen-cli
 ```
 
-## Generating base word list
+Create word list files and populate them with uppercase words, one per line
 
-A `word-list.txt` file in the root of this project containing all uppercase 5 and 6 letter words is required.
+```
+$ touch common-words.txt
+$ touch daily-words.txt
+$ touch full-words.txt
+```
 
-To obtain one, a word list like the "nykysuomen sanalista" by [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/), licensed with [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/deed.fi), can be used as a baseline.
+Start the UI in development mode
+```
+$ trunk serve
+```
+
+## Word lists
+
+Three separate word list files in the root of this project containing all the words are required. The lists are not included in this repository.
+
+The lists are:
+- `full-words.txt` - Full list of all accepted 5 and 6 character words. The checks if a word real or not is done against this list
+- `daily-words.txt` - List of daily words. The daily word is taken from row equal to the days from 2022-01-07.
+- `common-words.txt` - Subset of the full words list, intended for easier game mode. Note that all these words _must_ exist on the `full-words.txt`
+
+Beware that these are _included in the release binary_, and anyone can obtain the lists!
+
+## Generating base word lists
+
+To create a word list, a dictionary like the "nykysuomen sanalista" by [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/), licensed with [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/deed.fi), can be used as a baseline.
 
 A parser for parsing `kotus-sanalista_v1.xml` file from [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) is included:
 
@@ -33,7 +55,7 @@ A parser for parsing `kotus-sanalista_v1.xml` file from [Kotus](https://kaino.ko
 $ cargo run --bin parse-kotus-word-list your/path/to/kotus-sanalista_v1.xml
 ```
 
-which creates a `word-list.txt` file in the working directory.
+which creates a `full-words-generated.txt` file in the working directory.
 
 ## Development
 
@@ -54,7 +76,7 @@ $ trunk serve --port=9090
 ## Release build
 
 ```
-trunk build --release
+$ trunk build --release
 ```
 
 and copy the produced `dist` directory to your target server.

@@ -38,5 +38,5 @@ fn main() {
     let word_list = parse_word_list(data);
 
     let output_data = word_list.join("\n");
-    fs::write("word-list.txt", output_data).expect("Unable to write file");
+    fs::write("full-words-generated.txt", output_data).expect("Unable to write file");
 }
