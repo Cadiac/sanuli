@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## v1.5 - 2022-01-14
+
+### Added
+- Word list updates
+
+### Changed
+- Changed the keyboard layout to have backspace and submit buttons away from each other - thanks for the feedback!
+- Streaks are no longer reset when changing between game modes and settings. The plan is to persist the streaks for each game mode separately, but this should be better for now.
+
+### Fixed
+
+
 ## v1.4 - 2022-01-14
 
 ### Added
