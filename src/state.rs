@@ -17,32 +17,30 @@ const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 
-fn parse_all_words() -> HashMap<usize, HashSet<Vec<char>>> {
+fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
     let mut words = HashMap::with_capacity(2);
-    
     for word in FULL_WORDS.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
-        words.entry(word_length).or_insert(HashSet::new()).insert(chars.collect());
+        words
+            .entry((WordList::Full, word_length))
+            .or_insert(HashSet::new())
+            .insert(chars.collect());
+    }
+
+    for word in COMMON_WORDS.lines() {
+        let chars = word.chars();
+        let word_length = chars.clone().count();
+        words
+            .entry((WordList::Common, word_length))
+            .or_insert(HashSet::new())
+            .insert(chars.collect());
     }
 
     words
 }
 
-fn parse_words(word_list: WordList, word_length: usize) -> Vec<Vec<char>> {
-    let words = match word_list {
-        WordList::Full => FULL_WORDS,
-        WordList::Common => COMMON_WORDS
-    };
-
-    words
-        .lines()
-        .filter(|word| word.chars().count() == word_length)
-        .map(|word| word.chars().collect())
-        .collect()
-}
-
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum WordList {
     Full,
     Common,
@@ -145,9 +143,8 @@ pub enum CharacterCount {
 pub struct State {
     pub word: Vec<char>,
 
-    pub word_list: WordList,
-    pub current_word_list: Vec<Vec<char>>,
-    pub full_word_list: HashMap<usize, HashSet<Vec<char>>>,
+    pub current_word_list: WordList,
+    pub word_list: HashMap<(WordList, usize), HashSet<Vec<char>>>,
 
     pub word_length: usize,
     pub max_guesses: usize,
@@ -178,12 +175,21 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(word_length: usize, max_guesses: usize) -> Self {
-        let word_list = WordList::Common;
-        let full_word_list = parse_all_words();
-        let current_word_list = parse_words(word_list, word_length);
+    pub fn new() -> Self {
+        let word_length = DEFAULT_WORD_LENGTH;
+        let max_guesses = DEFAULT_MAX_GUESSES;
 
-        let word = current_word_list.choose(&mut rand::thread_rng()).unwrap().clone();
+        let word_list = parse_all_words();
+        let current_word_list = WordList::Common;
+
+        let word = if let Some(list) = word_list.get(&(current_word_list, word_length)) {
+            let v = list.iter().collect::<Vec<_>>();
+            let chosen = v.choose(&mut rand::thread_rng()).unwrap();
+            (*chosen).clone()
+        } else {
+            vec!['V', 'I', 'R', 'H', 'E']
+        };
+
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
             .take(max_guesses)
             .collect::<Vec<_>>();
@@ -200,7 +206,6 @@ impl State {
             word,
 
             word_list,
-            full_word_list,
             current_word_list,
 
             word_length,
@@ -426,16 +431,16 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self.full_word_list.get(&self.word_length) {
+        match self.word_list.get(&(WordList::Full, self.word_length)) {
             Some(list) => {
                 let word: &Vec<char> = &self.guesses[self.current_guess]
                     .iter()
                     .map(|(c, _)| *c)
                     .collect();
 
-                return list.contains(word)
+                return list.contains(word);
             }
-            None => false
+            None => false,
         }
     }
 
@@ -549,11 +554,16 @@ impl State {
     }
 
     pub fn get_random_word(&self) -> Vec<char> {
-        // TODO: No need to keep the full parsed list in memory, just pick one with correct length from string?
-        self.current_word_list
-            .choose(&mut rand::thread_rng())
+        // TODO: No need to keep all lists word_list, maybe just pick one from the file string?
+        let v = self
+            .word_list
+            .get(&(self.current_word_list, self.word_length))
             .unwrap()
-            .clone()
+            .iter()
+            .collect::<Vec<_>>();
+
+        let chosen = v.choose(&mut rand::thread_rng()).unwrap();
+        (*chosen).clone()
     }
 
     pub fn get_daily_word_index(&self) -> usize {
@@ -661,7 +671,6 @@ impl State {
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.word_length = new_length;
-        self.current_word_list = parse_words(self.word_list, self.word_length);
 
         // TODO: Store streaks for every word length separately
         self.streak = 0;
@@ -677,14 +686,12 @@ impl State {
         let _result = self.persist_settings();
 
         if self.game_mode == GameMode::DailyWord {
-            self.current_word_list = parse_words(WordList::Full, 5);
             self.word_length = 5;
         }
     }
 
     pub fn change_word_list(&mut self, new_list: WordList) {
-        self.word_list = new_list;
-        self.current_word_list = parse_words(self.word_list, self.word_length);
+        self.current_word_list = new_list;
         self.message = EMPTY.to_string();
         self.streak = 0;
         let _result = self.persist_settings();
@@ -698,7 +705,7 @@ impl State {
         if let Some(local_storage) = local_storage {
             local_storage.set_item("game_mode", &self.game_mode.to_string())?;
             local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
-            local_storage.set_item("word_list", format!("{}", self.word_list).as_str())?;
+            local_storage.set_item("word_list", format!("{}", self.current_word_list).as_str())?;
         }
 
         Ok(())
@@ -789,7 +796,6 @@ impl State {
     fn rehydrate_daily_word(&mut self) {
         self.word = self.get_daily_word();
         self.word_length = self.word.len();
-        self.current_word_list = parse_words(WordList::Full, self.word_length);
 
         let today = Local::now().naive_local().date();
         if let Some(solve) = self.daily_word_history.get(&today).cloned() {
@@ -817,16 +823,13 @@ impl State {
             let word_list_item = local_storage.get_item("word_list")?;
             if let Some(word_list_str) = word_list_item {
                 if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                    self.word_list = word_list;
+                    self.current_word_list = word_list;
                 }
             }
 
             let word_length_item = local_storage.get_item("word_length")?;
             if let Some(word_length_str) = word_length_item {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
-                    if word_length != self.word_length {
-                        self.current_word_list = parse_words(self.word_list, word_length);
-                    }
                     self.word_length = word_length;
                 }
             }

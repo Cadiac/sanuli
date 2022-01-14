@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.4 - 2022-01-14
+
+### Added
+
+### Changed
+
+### Fixed
+- Fixed a bug where if a user using the common list visited the daily word, the word list would be reset to full list, but still be shown as common words at the menu. Now the selected word list actually persists. Also changed how the word list is stored in state.
+
+
 ## v1.3 - 2022-01-13
 
 ### Added

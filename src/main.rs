@@ -46,7 +46,7 @@ impl Component for App {
 
     fn create(_ctx: &Context<Self>) -> Self {
         let mut initial_state = Self {
-            state: State::new(state::DEFAULT_WORD_LENGTH, state::DEFAULT_MAX_GUESSES),
+            state: State::new(),
             is_help_visible: false,
             is_menu_visible: false,
             keyboard_listener: None,
@@ -55,7 +55,7 @@ impl Component for App {
         if initial_state.state.rehydrate().is_err() {
             // Reinitialize and just continue with defaults
             initial_state.state =
-                State::new(state::DEFAULT_WORD_LENGTH, state::DEFAULT_MAX_GUESSES);
+                State::new();
         }
 
         initial_state
@@ -225,7 +225,7 @@ impl Component for App {
                                 callback={link.callback(move |msg| msg)}
                                 game_mode={self.state.game_mode}
                                 word_length={self.state.word_length}
-                                word_list={self.state.word_list}
+                                current_word_list={self.state.current_word_list}
                             />
                         }
                     } else {
