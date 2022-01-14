@@ -214,6 +214,14 @@ header {
     text-transform: uppercase;
 }
 
+.keyboard-button-submit {
+    flex: 4;
+}
+
+.keyboard-button-backspace {
+    flex: 1.5;
+}
+
 @keyframes slideInAnimation-1 {
     0% {
         transform : translateY(var(--slide-offset-1));

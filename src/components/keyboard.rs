@@ -6,7 +6,7 @@ use crate::Msg;
 
 use crate::components::{message::Message};
 
-const KEYBOARD_0: [char; 11] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Å'];
+const KEYBOARD_0: [char; 10] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 const KEYBOARD_1: [char; 11] = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'];
 const KEYBOARD_2: [char; 7] = ['Z', 'X', 'C', 'V', 'B', 'N', 'M'];
 
@@ -62,7 +62,9 @@ pub fn keyboard(props: &Props) -> Html {
                         }
                     }).collect::<Html>()
                 }
-                <div class="spacer" />
+                <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-backspace")} onmousedown={onbackspace}>
+                    { "⌫" }
+                </button>
             </div>
             <div class="keyboard-row">
                 <div class="spacer" />
@@ -86,6 +88,7 @@ pub fn keyboard(props: &Props) -> Html {
             <div class="keyboard-row">
                 <div class="spacer" />
                 <div class="spacer" />
+                <div class="spacer" />
                 {
                     KEYBOARD_2.iter().map(|key| {
                         let callback = props.callback.clone();
@@ -100,8 +103,6 @@ pub fn keyboard(props: &Props) -> Html {
                         }
                     }).collect::<Html>()
                 }
-                <button data-nosnippet="" class={classes!("keyboard-button")}
-                    onmousedown={onbackspace}>{ "⌫" }</button>
                 {
                     if props.is_guessing {
                         let callback = props.callback.clone();
@@ -111,7 +112,7 @@ pub fn keyboard(props: &Props) -> Html {
                         });
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button")}
+                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit")}
                                 onmousedown={onmousedown}>
                                 { "ARVAA" }
                             </button>
@@ -124,7 +125,7 @@ pub fn keyboard(props: &Props) -> Html {
                         });
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "correct")}
+                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
                                 onmousedown={onmousedown}>
                                 { "TAKAISIN" }
                             </button>
@@ -137,7 +138,7 @@ pub fn keyboard(props: &Props) -> Html {
                         });
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "correct")}
+                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
                                 onmousedown={onmousedown}>
                                 { "UUSI?" }
                             </button>
