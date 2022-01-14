@@ -673,7 +673,6 @@ impl State {
         self.word_length = new_length;
 
         // TODO: Store streaks for every word length separately
-        self.streak = 0;
 
         if self.game_mode == GameMode::DailyWord {
             self.game_mode = GameMode::Classic;
@@ -693,7 +692,6 @@ impl State {
     pub fn change_word_list(&mut self, new_list: WordList) {
         self.current_word_list = new_list;
         self.message = EMPTY.to_string();
-        self.streak = 0;
         let _result = self.persist_settings();
     }
 
