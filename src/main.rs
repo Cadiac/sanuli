@@ -31,6 +31,7 @@ pub enum Msg {
     ChangePreviousGameMode,
     ChangeWordLength(usize),
     ChangeWordList(WordList),
+    ChangeAllowProfanities(bool),
 }
 
 pub struct App {
@@ -159,7 +160,13 @@ impl Component for App {
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
-            }
+            },
+            Msg::ChangeAllowProfanities(is_allowed) => {
+                self.state.change_allow_profanities(is_allowed);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
+                true
+            },
         }
     }
 
@@ -226,6 +233,7 @@ impl Component for App {
                                 game_mode={self.state.game_mode}
                                 word_length={self.state.word_length}
                                 current_word_list={self.state.current_word_list}
+                                allow_profanities={self.state.allow_profanities}
                             />
                         }
                     } else {

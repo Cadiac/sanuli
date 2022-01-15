@@ -27,6 +27,7 @@ Create word list files and populate them with uppercase words, one per line
 $ touch common-words.txt
 $ touch daily-words.txt
 $ touch full-words.txt
+$ touch profanities.txt
 ```
 
 Start the UI in development mode
@@ -42,6 +43,7 @@ The lists are:
 - `full-words.txt` - Full list of all accepted 5 and 6 character words. The checks if a word real or not is done against this list
 - `daily-words.txt` - List of daily words. The daily word is taken from row equal to the days from 2022-01-07.
 - `common-words.txt` - Subset of the full words list, intended for easier game mode. Note that all these words _must_ exist on the `full-words.txt`
+- `profanities.txt` - Words filtered out when profanities filter is enabled
 
 Beware that these are _included in the release binary_, and anyone can obtain the lists!
 

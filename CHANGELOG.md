@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.6 - 2022-01-15
+
+### Added
+- Profanities filter, which removes some words from the pool of words to guess from.
+
+### Changed
+
+### Fixed
+
 
 ## v1.5 - 2022-01-14
 

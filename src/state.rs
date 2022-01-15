@@ -12,6 +12,7 @@ use web_sys::{window, Window};
 const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
+const PROFANITIES: &str = include_str!("../profanities.txt");
 const EMPTY: char = '\u{00a0}'; // &nbsp;
 const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
 pub const DEFAULT_WORD_LENGTH: usize = 5;
@@ -37,6 +38,15 @@ fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
             .insert(chars.collect());
     }
 
+    for word in PROFANITIES.lines() {
+        let chars = word.chars();
+        let word_length = chars.clone().count();
+        words
+            .entry((WordList::Profanities, word_length))
+            .or_insert(HashSet::new())
+            .insert(chars.collect());
+    }
+
     words
 }
 
@@ -44,6 +54,7 @@ fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
 pub enum WordList {
     Full,
     Common,
+    Profanities,
 }
 
 impl FromStr for WordList {
@@ -53,6 +64,7 @@ impl FromStr for WordList {
         match input {
             "full" => Ok(WordList::Full),
             "common" => Ok(WordList::Common),
+            "profanities" => Ok(WordList::Profanities),
             _ => Err(()),
         }
     }
@@ -63,6 +75,7 @@ impl fmt::Display for WordList {
         match self {
             WordList::Full => write!(f, "full"),
             WordList::Common => write!(f, "common"),
+            WordList::Profanities => write!(f, "profanities"),
         }
     }
 }
@@ -144,7 +157,8 @@ pub struct State {
     pub word: Vec<char>,
 
     pub current_word_list: WordList,
-    pub word_list: HashMap<(WordList, usize), HashSet<Vec<char>>>,
+    pub word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>>,
+    pub allow_profanities: bool,
 
     pub word_length: usize,
     pub max_guesses: usize,
@@ -179,16 +193,16 @@ impl State {
         let word_length = DEFAULT_WORD_LENGTH;
         let max_guesses = DEFAULT_MAX_GUESSES;
 
-        let word_list = parse_all_words();
+        let word_lists = parse_all_words();
         let current_word_list = WordList::Common;
+        let allow_profanities = true;
 
-        let word = if let Some(list) = word_list.get(&(current_word_list, word_length)) {
-            let v = list.iter().collect::<Vec<_>>();
-            let chosen = v.choose(&mut rand::thread_rng()).unwrap();
-            (*chosen).clone()
-        } else {
-            vec!['V', 'I', 'R', 'H', 'E']
-        };
+        let word = State::get_random_word(
+            &word_lists,
+            current_word_list,
+            word_length,
+            allow_profanities,
+        );
 
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
             .take(max_guesses)
@@ -205,8 +219,9 @@ impl State {
         Self {
             word,
 
-            word_list,
+            word_lists,
             current_word_list,
+            allow_profanities,
 
             word_length,
             max_guesses,
@@ -431,7 +446,7 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self.word_list.get(&(WordList::Full, self.word_length)) {
+        match self.word_lists.get(&(WordList::Full, self.word_length)) {
             Some(list) => {
                 let word: &Vec<char> = &self.guesses[self.current_guess]
                     .iter()
@@ -553,16 +568,25 @@ impl State {
         true
     }
 
-    pub fn get_random_word(&self) -> Vec<char> {
-        // TODO: No need to keep all lists word_list, maybe just pick one from the file string?
-        let v = self
-            .word_list
-            .get(&(self.current_word_list, self.word_length))
+    pub fn get_random_word(
+        word_lists: &HashMap<(WordList, usize), HashSet<Vec<char>>>,
+        current: WordList,
+        word_length: usize,
+        allow_profanities: bool,
+    ) -> Vec<char> {
+        let mut words = word_lists
+            .get(&(current, word_length))
             .unwrap()
             .iter()
             .collect::<Vec<_>>();
 
-        let chosen = v.choose(&mut rand::thread_rng()).unwrap();
+        if !allow_profanities {
+            if let Some(profanities) = word_lists.get(&(WordList::Profanities, word_length)) {
+                words.retain(|word| !profanities.contains(*word));
+            }
+        }
+
+        let chosen = words.choose(&mut rand::thread_rng()).unwrap();
         (*chosen).clone()
     }
 
@@ -588,7 +612,12 @@ impl State {
         let next_word = if self.game_mode == GameMode::DailyWord {
             self.get_daily_word()
         } else {
-            self.get_random_word()
+            State::get_random_word(
+                &self.word_lists,
+                self.current_word_list,
+                self.word_length,
+                self.allow_profanities,
+            )
         };
 
         let previous_word = mem::replace(&mut self.word, next_word);
@@ -695,6 +724,11 @@ impl State {
         let _result = self.persist_settings();
     }
 
+    pub fn change_allow_profanities(&mut self, is_allowed: bool) {
+        self.allow_profanities = is_allowed;
+        let _result = self.persist_settings();
+    }
+
     // Persisting & restoring game state
 
     fn persist_settings(&mut self) -> Result<(), JsValue> {
@@ -704,6 +738,7 @@ impl State {
             local_storage.set_item("game_mode", &self.game_mode.to_string())?;
             local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
             local_storage.set_item("word_list", format!("{}", self.current_word_list).as_str())?;
+            local_storage.set_item("allow_profanities", format!("{}", self.allow_profanities).as_str())?;
         }
 
         Ok(())
@@ -829,6 +864,13 @@ impl State {
             if let Some(word_length_str) = word_length_item {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     self.word_length = word_length;
+                }
+            }
+
+            let allow_profanities_item = local_storage.get_item("allow_profanities")?;
+            if let Some(allow_profanities_str) = allow_profanities_item {
+                if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
+                    self.allow_profanities = allow_profanities;
                 }
             }
 
