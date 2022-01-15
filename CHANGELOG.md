@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Profanities filter, which removes some words from the pool of words to guess from.
+- Some statistics of past games added to menu
 
 ### Changed
 

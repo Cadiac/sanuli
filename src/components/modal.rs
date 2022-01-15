@@ -72,6 +72,10 @@ pub struct MenuModalProps {
     pub game_mode: GameMode,
     pub current_word_list: WordList,
     pub allow_profanities: bool,
+
+    pub max_streak: usize,
+    pub total_played: usize,
+    pub total_solved: usize,
 }
 
 #[function_component(MenuModal)]
@@ -147,6 +151,14 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         {"Päivän sanuli"}
                     </button>
                 </div>
+            </div>
+            <div>
+                <label class="label">{"Omat tilastosi:"}</label>
+                <ul>
+                    <li class="statistics">{format!("Pisin putki: {}", props.max_streak)}</li>
+                    <li class="statistics">{format!("Pelit yhteensä: {}", props.total_played)}</li>
+                    <li class="statistics">{format!("Löydetyt sanulit: {}", props.total_solved)}</li>
+                </ul>
             </div>
             <div class="version">
                 <a class="version" href={CHANGELOG_URL} target="_blank">{ VERSION }</a>

@@ -105,6 +105,15 @@ header {
     text-align: center;
 }
 
+.statistics {
+    margin-top: 6px;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
 .link {
     color: var(--text);
 }

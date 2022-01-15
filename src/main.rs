@@ -234,6 +234,9 @@ impl Component for App {
                                 word_length={self.state.word_length}
                                 current_word_list={self.state.current_word_list}
                                 allow_profanities={self.state.allow_profanities}
+                                max_streak={self.state.max_streak}
+                                total_played={self.state.total_played}
+                                total_solved={self.state.total_solved}
                             />
                         }
                     } else {
