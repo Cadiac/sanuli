@@ -891,57 +891,50 @@ impl State {
 
     fn rehydrate_game(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
-        if let Some(local_storage) = window.local_storage().expect("local storage not available") {
-            let word_list_item = local_storage.get_item("word_list")?;
-            if let Some(word_list_str) = word_list_item {
+        if let Some(local_storage) = window.local_storage()? {
+            if let Some(word_list_str) = local_storage.get_item("word_list")? {
                 if let Ok(word_list) = word_list_str.parse::<WordList>() {
                     self.current_word_list = word_list;
                 }
             }
 
-            let word_length_item = local_storage.get_item("word_length")?;
-            if let Some(word_length_str) = word_length_item {
+            if let Some(word_length_str) = local_storage.get_item("word_length")? {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     self.word_length = word_length;
                 }
             }
 
-            let allow_profanities_item = local_storage.get_item("allow_profanities")?;
-            if let Some(allow_profanities_str) = allow_profanities_item {
+            if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
                 if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
                     self.allow_profanities = allow_profanities;
                 }
             }
 
-            let theme_item = local_storage.get_item("theme")?;
-            if let Some(theme_str) = theme_item {
+            if let Some(theme_str) = local_storage.get_item("theme")? {
                 if let Ok(theme) = theme_str.parse::<Theme>() {
                     self.theme = theme;
                 }
             }
 
-            let word = local_storage.get_item("word")?;
-            if let Some(word) = word {
+            if let Some(word) = local_storage.get_item("word")? {
                 self.word = word.chars().collect();
             } else {
                 local_storage.set_item("word", &self.word.iter().collect::<String>())?;
             }
-            let is_guessing_item = local_storage.get_item("is_guessing")?;
-            if let Some(is_guessing_str) = is_guessing_item {
+
+            if let Some(is_guessing_str) = local_storage.get_item("is_guessing")? {
                 if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
                     self.is_guessing = is_guessing;
                 }
             }
 
-            let is_winner_item = local_storage.get_item("is_winner")?;
-            if let Some(is_winner_str) = is_winner_item {
+            if let Some(is_winner_str) = local_storage.get_item("is_winner")? {
                 if let Ok(is_winner) = is_winner_str.parse::<bool>() {
                     self.is_winner = is_winner;
                 }
             }
 
-            let guesses_item = local_storage.get_item("guesses")?;
-            if let Some(guesses_str) = guesses_item {
+            if let Some(guesses_str) = local_storage.get_item("guesses")? {
                 let previous_guesses = guesses_str
                     .split(',')
                     .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
@@ -953,8 +946,7 @@ impl State {
                 }
             }
 
-            let current_guess_item = local_storage.get_item("current_guess")?;
-            if let Some(current_guess_str) = current_guess_item {
+            if let Some(current_guess_str) = local_storage.get_item("current_guess")? {
                 if let Ok(current_guess) = current_guess_str.parse::<usize>() {
                     self.current_guess = current_guess;
                 }
@@ -968,15 +960,13 @@ impl State {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage().expect("local storage not available") {
             // Common state
-            let game_mode_item = local_storage.get_item("game_mode")?;
-            if let Some(game_mode_str) = game_mode_item {
+            if let Some(game_mode_str) = local_storage.get_item("game_mode")? {
                 if let Ok(new_mode) = game_mode_str.parse::<GameMode>() {
                     self.previous_game_mode = mem::replace(&mut self.game_mode, new_mode);
                 }
             }
 
-            let daily_word_history_item = local_storage.get_item("daily_word_history")?;
-            if let Some(daily_word_history_str) = daily_word_history_item {
+            if let Some(daily_word_history_str) = local_storage.get_item("daily_word_history")? {
                 if daily_word_history_str.len() != 0 {
                     daily_word_history_str.split(',').for_each(|date_str| {
                         let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
@@ -1011,35 +1001,30 @@ impl State {
                 }
             }
 
-            let message_item = local_storage.get_item("message")?;
-            if let Some(message_str) = message_item {
+            if let Some(message_str) = local_storage.get_item("message")? {
                 self.message = message_str;
             }
 
             // Stats
-            let streak_item = local_storage.get_item("streak")?;
-            if let Some(streak_str) = streak_item {
+            if let Some(streak_str) = local_storage.get_item("streak")? {
                 if let Ok(streak) = streak_str.parse::<usize>() {
                     self.streak = streak;
                 }
             }
 
-            let max_streak_item = local_storage.get_item("max_streak")?;
-            if let Some(max_streak_str) = max_streak_item {
+            if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
                 if let Ok(max_streak) = max_streak_str.parse::<usize>() {
                     self.max_streak = max_streak;
                 }
             }
 
-            let total_played_item = local_storage.get_item("total_played")?;
-            if let Some(total_played_str) = total_played_item {
+            if let Some(total_played_str) = local_storage.get_item("total_played")? {
                 if let Ok(total_played) = total_played_str.parse::<usize>() {
                     self.total_played = total_played;
                 }
             }
 
-            let total_solved_item = local_storage.get_item("total_solved")?;
-            if let Some(total_solved_str) = total_solved_item {
+            if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
                 if let Ok(total_solved) = total_solved_str.parse::<usize>() {
                     self.total_solved = total_solved;
                 }
