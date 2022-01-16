@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.7 - 2022-01-16
+
+### Added
+- Add theme for colorblind mode, available at settings
+
+### Changed
+
+### Fixed
+
+
 ## v1.6 - 2022-01-15
 
 ### Added
