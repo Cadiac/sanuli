@@ -156,8 +156,8 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 <label class="label">{"Omat tilastosi:"}</label>
                 <ul>
                     <li class="statistics">{format!("Pisin putki: {}", props.max_streak)}</li>
-                    <li class="statistics">{format!("Pelit yhteensä: {}", props.total_played)}</li>
-                    <li class="statistics">{format!("Löydetyt sanulit: {}", props.total_solved)}</li>
+                    <li class="statistics">{format!("Pelatut sanulit: {}", props.total_played)}</li>
+                    <li class="statistics">{format!("Ratkaistut sanulit: {}", props.total_solved)}</li>
                 </ul>
             </div>
             <div class="version">
