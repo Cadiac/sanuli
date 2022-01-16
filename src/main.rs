@@ -12,7 +12,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use state::{GameMode, State, TileState, WordList};
+use state::{GameMode, State, TileState, WordList, Theme};
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
@@ -32,6 +32,7 @@ pub enum Msg {
     ChangeWordLength(usize),
     ChangeWordList(WordList),
     ChangeAllowProfanities(bool),
+    ChangeTheme(Theme)
 }
 
 pub struct App {
@@ -150,23 +151,27 @@ impl Component for App {
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
-            },
+            }
             Msg::ChangePreviousGameMode => {
                 self.state.change_game_mode(self.state.previous_game_mode.clone());
                 self.state.create_new_game()
-            },
+            }
             Msg::ChangeWordList(list) => {
                 self.state.change_word_list(list);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
-            },
+            }
             Msg::ChangeAllowProfanities(is_allowed) => {
                 self.state.change_allow_profanities(is_allowed);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 true
             },
+            Msg::ChangeTheme(theme) => {
+                self.state.change_theme(theme);
+                true
+            }
         }
     }
 
@@ -186,7 +191,7 @@ impl Component for App {
             .collect::<String>();
 
         html! {
-            <div class="game">
+            <div class={classes!("game", self.state.theme.to_string())}>
                 <Header
                     on_toggle_help_cb={link.callback(|_| Msg::ToggleHelp)}
                     on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
@@ -234,6 +239,7 @@ impl Component for App {
                                 word_length={self.state.word_length}
                                 current_word_list={self.state.current_word_list}
                                 allow_profanities={self.state.allow_profanities}
+                                theme={self.state.theme}
                                 max_streak={self.state.max_streak}
                                 total_played={self.state.total_played}
                                 total_solved={self.state.total_solved}

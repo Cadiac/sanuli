@@ -15,6 +15,11 @@
     font-family: 'Clear Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
+.colorblind {
+    --correct: #f5793a;
+    --present: #85c0f9;
+}
+
 html {
     height: 100%;
 }

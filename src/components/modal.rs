@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::state::{GameMode, WordList};
+use crate::state::{GameMode, WordList, Theme};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
@@ -72,6 +72,7 @@ pub struct MenuModalProps {
     pub game_mode: GameMode,
     pub current_word_list: WordList,
     pub allow_profanities: bool,
+    pub theme: Theme,
 
     pub max_streak: usize,
     pub total_played: usize,
@@ -92,6 +93,8 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
     let change_allow_profanities_yes = onmousedown!(callback, Msg::ChangeAllowProfanities(true));
     let change_allow_profanities_no = onmousedown!(callback, Msg::ChangeAllowProfanities(false));
+    let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
+    let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
     html! {
         <div class="modal">
@@ -159,6 +162,19 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <li class="statistics">{format!("Pelatut sanulit: {}", props.total_played)}</li>
                     <li class="statistics">{format!("Ratkaistut sanulit: {}", props.total_solved)}</li>
                 </ul>
+            </div>
+            <div>
+                <label class="label">{"Teema:"}</label>
+                <div class="select-container">
+                    <button class={classes!("select", (props.theme == Theme::Dark).then(|| Some("select-active")))}
+                        onmousedown={change_theme_dark}>
+                        {"Oletus"}
+                    </button>
+                    <button class={classes!("select", (props.theme == Theme::Colorblind).then(|| Some("select-active")))}
+                        onmousedown={change_theme_colorblind}>
+                        {"Värisokeille"}
+                    </button>
+                </div>
             </div>
             <div class="version">
                 <a class="version" href={CHANGELOG_URL} target="_blank">{ VERSION }</a>

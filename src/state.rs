@@ -110,6 +110,34 @@ impl fmt::Display for GameMode {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum Theme {
+    Dark,
+    Colorblind,
+}
+
+impl FromStr for Theme {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Theme, Self::Err> {
+        match input {
+            "dark" => Ok(Theme::Dark),
+            "colorblind" => Ok(Theme::Colorblind),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for Theme {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Theme::Dark => write!(f, "dark"),
+            Theme::Colorblind => write!(f, "colorblind"),
+        }
+    }
+}
+
+
 #[derive(Clone, PartialEq)]
 pub enum CharacterState {
     Correct,
@@ -167,6 +195,8 @@ pub struct State {
     pub is_winner: bool,
     pub is_unknown: bool,
     pub is_reset: bool,
+
+    pub theme: Theme,
 
     pub daily_word_history: HashMap<NaiveDate, DailyWordHistory>,
 
@@ -230,6 +260,8 @@ impl State {
             is_winner: false,
             is_unknown: false,
             is_reset: false,
+
+            theme: Theme::Dark,
 
             daily_word_history: HashMap::new(),
 
@@ -729,6 +761,12 @@ impl State {
         let _result = self.persist_settings();
     }
 
+    pub fn change_theme(&mut self, theme: Theme) -> bool {
+        self.theme = theme;
+        let _result = self.persist_settings();
+        true
+    }
+
     // Persisting & restoring game state
 
     fn persist_settings(&mut self) -> Result<(), JsValue> {
@@ -739,6 +777,7 @@ impl State {
             local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
             local_storage.set_item("word_list", format!("{}", self.current_word_list).as_str())?;
             local_storage.set_item("allow_profanities", format!("{}", self.allow_profanities).as_str())?;
+            local_storage.set_item("theme", format!("{}", self.theme).as_str())?;
         }
 
         Ok(())
@@ -871,6 +910,13 @@ impl State {
             if let Some(allow_profanities_str) = allow_profanities_item {
                 if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
                     self.allow_profanities = allow_profanities;
+                }
+            }
+
+            let theme_item = local_storage.get_item("theme")?;
+            if let Some(theme_str) = theme_item {
+                if let Ok(theme) = theme_str.parse::<Theme>() {
+                    self.theme = theme;
                 }
             }
 
