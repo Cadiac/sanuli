@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::mem;
+use std::rc::Rc;
+use std::cell::{RefCell, RefMut};
 use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
@@ -18,12 +20,14 @@ const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 
-fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
-    let mut words = HashMap::with_capacity(2);
+type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
+
+fn parse_all_words() -> Rc<WordLists> {
+    let mut word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>> = HashMap::with_capacity(2);
     for word in FULL_WORDS.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
-        words
+        word_lists
             .entry((WordList::Full, word_length))
             .or_insert(HashSet::new())
             .insert(chars.collect());
@@ -32,7 +36,7 @@ fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
     for word in COMMON_WORDS.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
-        words
+        word_lists
             .entry((WordList::Common, word_length))
             .or_insert(HashSet::new())
             .insert(chars.collect());
@@ -41,13 +45,13 @@ fn parse_all_words() -> HashMap<(WordList, usize), HashSet<Vec<char>>> {
     for word in PROFANITIES.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
-        words
+        word_lists
             .entry((WordList::Profanities, word_length))
             .or_insert(HashSet::new())
             .insert(chars.collect());
     }
 
-    words
+    Rc::new(word_lists)
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -80,7 +84,7 @@ impl fmt::Display for WordList {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub enum GameMode {
     Classic,
     Relay,
@@ -137,7 +141,6 @@ impl fmt::Display for Theme {
     }
 }
 
-
 #[derive(Clone, PartialEq)]
 pub enum CharacterState {
     Correct,
@@ -182,57 +185,598 @@ pub enum CharacterCount {
 
 #[derive(Clone, PartialEq)]
 pub struct State {
-    pub word: Vec<char>,
+    pub game_manager: Rc<RefCell<GameManager>>,
+    pub game: Game,
+    pub background_games: HashMap<(GameMode, WordList, usize), Game>,
+}
 
-    pub current_word_list: WordList,
-    pub word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>>,
+impl State {
+    pub fn new() -> Self {
+        let game_manager = Rc::new(RefCell::new(GameManager::new()));
+        let game = Game::new(
+            GameMode::Classic,
+            WordList::Full,
+            DEFAULT_WORD_LENGTH,
+            vec!['V', 'I', 'R', 'H', 'E'],
+            game_manager.clone()
+        );
+        let background_games = HashMap::new();
+
+        Self {
+            game_manager,
+            game,
+            background_games,
+        }
+    }
+
+    // pub fn switch_game(&self) -> &Game {
+    //     self.games
+    //         .get(&(
+    //             self.game_manager.current_game_mode,
+    //             self.game_manager.current_word_list,
+    //             self.game_manager.current_word_length,
+    //         ))
+    //         .unwrap()
+    // }
+
+    pub fn create_new_game(&mut self) -> bool {
+        let next_word = if self.game_manager.borrow().current_game_mode == GameMode::DailyWord {
+            self.game_manager.borrow().get_daily_word()
+        } else {
+            self.game_manager.borrow().get_random_word()
+        };
+
+        /*
+        let previous_word = mem::replace(&mut self.word, next_word);
+
+        if previous_word.len() <= self.word_length {
+            self.previous_guesses = mem::take(&mut self.guesses);
+            self.previous_guesses.truncate(self.current_guess);
+        } else {
+            let previous_guesses = mem::take(&mut self.guesses);
+            self.previous_guesses = previous_guesses
+                .into_iter()
+                .map(|guess| guess.into_iter().take(self.word_length).collect())
+                .collect();
+            self.previous_guesses.truncate(self.current_guess);
+        }
+
+        self.guesses = Vec::with_capacity(self.max_guesses);
+
+        self.known_states = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+        self.discovered_counts = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+
+        if previous_word.len() == self.word_length
+            && self.is_winner
+            && self.game_mode == GameMode::Relay
+        {
+            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses - 1)
+                .collect::<Vec<_>>();
+
+            self.guesses.push(
+                previous_word
+                    .iter()
+                    .map(|c| (*c, TileState::Unknown))
+                    .collect(),
+            );
+            self.guesses.extend(empty_guesses);
+
+            self.current_guess = 0;
+            self.submit_current_guess();
+            self.current_guess = 1;
+        } else {
+            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses)
+                .collect::<Vec<_>>();
+            self.current_guess = 0;
+        }
+
+        self.is_guessing = true;
+        self.is_winner = false;
+        self.is_reset = true;
+        self.clear_message();
+
+        if self.game_mode == GameMode::DailyWord {
+            let today = Local::now().naive_local().date();
+            if let Some(solve) = self.game_manager.daily_word_history.get(&today).cloned() {
+                for (guess_index, guess) in solve.guesses.iter().enumerate() {
+                    self.guesses[guess_index] =
+                        guess.iter().map(|c| (*c, TileState::Unknown)).collect();
+                    self.current_guess = guess_index;
+                    self.submit_current_guess();
+                }
+                self.is_winner = solve.is_winner;
+                self.is_guessing = solve.is_guessing;
+                self.current_guess = solve.current_guess;
+            }
+
+            if !self.is_guessing {
+                self.message = "Uusi sanuli huomenna!".to_owned();
+            }
+        } else {
+            let _result = self.game_manager.persist_game(self);
+        }
+        */
+
+        true
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct GameManager {
+    pub word_lists: Rc<WordLists>,
     pub allow_profanities: bool,
 
-    pub word_length: usize,
-    pub max_guesses: usize,
+    pub current_word_list: WordList,
+    pub current_word_length: usize,
+    pub current_max_guesses: usize,
 
-    pub is_guessing: bool,
-    pub is_winner: bool,
-    pub is_unknown: bool,
-    pub is_reset: bool,
-
-    pub theme: Theme,
-
-    pub daily_word_history: HashMap<NaiveDate, DailyWordHistory>,
-
-    pub game_mode: GameMode,
+    pub current_game_mode: GameMode,
     pub previous_game_mode: GameMode,
 
-    pub message: String,
+    pub theme: Theme,
+    pub daily_word_history: HashMap<NaiveDate, DailyWordHistory>,
 
-    pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
-    pub discovered_counts: Vec<HashMap<char, CharacterCount>>,
-
-    pub guesses: Vec<Vec<(char, TileState)>>,
-    pub previous_guesses: Vec<Vec<(char, TileState)>>,
-    pub current_guess: usize,
-
-    pub streak: usize,
     pub max_streak: usize,
     pub total_played: usize,
     pub total_solved: usize,
 }
 
-impl State {
+impl GameManager {
     pub fn new() -> Self {
-        let word_length = DEFAULT_WORD_LENGTH;
-        let max_guesses = DEFAULT_MAX_GUESSES;
-
         let word_lists = parse_all_words();
         let current_word_list = WordList::Common;
+        let current_word_length = DEFAULT_WORD_LENGTH;
+        let current_max_guesses = DEFAULT_MAX_GUESSES;
         let allow_profanities = true;
 
-        let word = State::get_random_word(
-            &word_lists,
+        Self {
+            word_lists,
             current_word_list,
-            word_length,
             allow_profanities,
+
+            current_max_guesses,
+
+            current_game_mode: GameMode::Classic,
+            previous_game_mode: GameMode::Classic,
+            current_word_length,
+
+            theme: Theme::Dark,
+            daily_word_history: HashMap::new(),
+
+            max_streak: 0,
+            total_played: 0,
+            total_solved: 0,
+        }
+    }
+
+    pub fn get_random_word(&self) -> Vec<char> {    
+        let mut words = self.word_lists
+            .get(&(self.current_word_list, self.current_word_length))
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+
+        if !self.allow_profanities {
+            if let Some(profanities) = self.word_lists.get(&(WordList::Profanities, self.current_word_length)) {
+                words.retain(|word| !profanities.contains(*word));
+            }
+        }
+
+        let chosen = words.choose(&mut rand::thread_rng()).unwrap();
+        (*chosen).clone()
+    }
+
+    pub fn get_daily_word_index(&self) -> usize {
+        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
+        Local::now()
+            .naive_local()
+            .date()
+            .signed_duration_since(epoch)
+            .num_days() as usize
+    }
+
+    pub fn get_daily_word(&self) -> Vec<char> {
+        DAILY_WORDS
+            .lines()
+            .nth(self.get_daily_word_index())
+            .unwrap()
+            .chars()
+            .collect()
+    }
+
+    fn update_game_statistics(&mut self, is_winner: bool, streak: usize) {
+        self.total_played += 1;
+
+        if is_winner {
+            self.total_solved += 1;
+
+            if streak > self.max_streak {
+                self.max_streak = streak;
+            }
+        }
+    }
+
+    fn set_daily_word_history(&mut self, game: &Game, date: &NaiveDate) {
+        self.daily_word_history.insert(
+            *date,
+            DailyWordHistory {
+                word: game.word.iter().collect(),
+                date: *date,
+                guesses: game
+                    .guesses
+                    .iter()
+                    .map(|guess| guess.iter().map(|(c, _)| *c).collect())
+                    .collect(),
+                current_guess: game.current_guess,
+                is_guessing: game.is_guessing,
+                is_winner: game.is_winner,
+            },
         );
+    }
+
+    pub fn change_word_length(&mut self, new_length: usize) {
+        self.current_word_length = new_length;
+
+        // TODO: Store streaks for every word length separately
+
+        if self.current_game_mode == GameMode::DailyWord {
+            self.current_game_mode = GameMode::Classic;
+        }
+    }
+
+    pub fn change_game_mode(&mut self, new_mode: GameMode) {
+        self.previous_game_mode = std::mem::replace(&mut self.current_game_mode, new_mode);
+
+        let _result = self.persist_settings();
+
+        if self.current_game_mode == GameMode::DailyWord {
+            self.current_word_length = 5;
+        }
+    }
+
+    pub fn change_word_list(&mut self, new_list: WordList) {
+        self.current_word_list = new_list;
+        let _result = self.persist_settings();
+    }
+
+    pub fn change_allow_profanities(&mut self, is_allowed: bool) {
+        self.allow_profanities = is_allowed;
+        let _result = self.persist_settings();
+    }
+
+    pub fn change_theme(&mut self, theme: Theme) -> bool {
+        self.theme = theme;
+        let _result = self.persist_settings();
+        true
+    }
+
+    // Persisting & restoring game state
+
+    fn persist_settings(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("game_mode", &self.current_game_mode.to_string())?;
+            local_storage.set_item(
+                "word_length",
+                format!("{}", self.current_word_length).as_str(),
+            )?;
+            local_storage.set_item("word_list", format!("{}", self.current_word_list).as_str())?;
+            local_storage.set_item(
+                "allow_profanities",
+                format!("{}", self.allow_profanities).as_str(),
+            )?;
+            local_storage.set_item("theme", format!("{}", self.theme).as_str())?;
+        }
+
+        Ok(())
+    }
+
+    fn persist_stats(&self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            // local_storage.set_item("streak", &format!("{}", self.streak))?;
+            local_storage.set_item("max_streak", &format!("{}", self.max_streak))?;
+            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
+            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
+        }
+
+        Ok(())
+    }
+
+    fn persist_game(&self, game: &Game) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+        if let Some(local_storage) = local_storage {
+            local_storage.set_item("word", &game.word.iter().collect::<String>())?;
+            local_storage.set_item("word_length", &format!("{}", game.word_length))?;
+            local_storage.set_item("current_guess", &format!("{}", game.current_guess))?;
+            local_storage.set_item(
+                "guesses",
+                &game
+                    .guesses
+                    .iter()
+                    .map(|guess| guess.iter().map(|(c, _)| c).collect::<String>())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            )?;
+            local_storage.set_item("message", &game.message)?;
+            local_storage.set_item("is_guessing", format!("{}", game.is_guessing).as_str())?;
+            local_storage.set_item("is_winner", format!("{}", game.is_winner).as_str())?;
+        }
+
+        Ok(())
+    }
+
+    fn persist_single_daily_word(&self, date: &NaiveDate) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        let local_storage = window.local_storage().expect("local storage not available");
+
+        if let Some(local_storage) = local_storage {
+            if let Some(history) = self.daily_word_history.get(date) {
+                local_storage.set_item(
+                    &format!("daily_word_history[{}]", date.format("%Y-%m-%d")),
+                    &format!(
+                        "{}|{}|{}|{}|{}|{}",
+                        history.word,
+                        history.date.format("%Y-%m-%d"),
+                        history
+                            .guesses
+                            .iter()
+                            .map(|guess| guess.iter().collect::<String>())
+                            .collect::<Vec<_>>()
+                            .join(","),
+                        history.current_guess,
+                        history.is_guessing,
+                        history.is_winner
+                    ),
+                )?;
+            }
+
+            local_storage.set_item(
+                "daily_word_history",
+                &format!(
+                    "{}",
+                    &self
+                        .daily_word_history
+                        .keys()
+                        .map(|date| date.format("%Y-%m-%d").to_string())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            )?;
+
+            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
+            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
+        }
+
+        Ok(())
+    }
+
+    /*
+    fn rehydrate_daily_word(&mut self) {
+        self.word = self.get_daily_word();
+        self.word_length = self.word.len();
+
+        let today = Local::now().naive_local().date();
+        if let Some(solve) = self.daily_word_history.get(&today).cloned() {
+            for (guess_index, guess) in solve.guesses.iter().enumerate() {
+                self.guesses[guess_index] =
+                    guess.iter().map(|c| (*c, TileState::Unknown)).collect();
+                self.current_guess = guess_index;
+                self.submit_current_guess();
+            }
+            self.is_guessing = solve.is_guessing;
+            self.is_winner = solve.is_winner;
+            self.current_guess = solve.current_guess;
+
+            if !self.is_guessing {
+                self.message = "Uusi sanuli huomenna!".to_owned();
+            } else {
+                self.message = EMPTY.to_string()
+            }
+        }
+    }
+
+    fn rehydrate_game(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        if let Some(local_storage) = window.local_storage()? {
+            if let Some(word_list_str) = local_storage.get_item("word_list")? {
+                if let Ok(word_list) = word_list_str.parse::<WordList>() {
+                    self.current_word_list = word_list;
+                }
+            }
+
+            if let Some(word_length_str) = local_storage.get_item("word_length")? {
+                if let Ok(word_length) = word_length_str.parse::<usize>() {
+                    self.word_length = word_length;
+                }
+            }
+
+            if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
+                if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
+                    self.allow_profanities = allow_profanities;
+                }
+            }
+
+            if let Some(theme_str) = local_storage.get_item("theme")? {
+                if let Ok(theme) = theme_str.parse::<Theme>() {
+                    self.theme = theme;
+                }
+            }
+
+            if let Some(word) = local_storage.get_item("word")? {
+                self.word = word.chars().collect();
+            } else {
+                local_storage.set_item("word", &self.word.iter().collect::<String>())?;
+            }
+
+            if let Some(is_guessing_str) = local_storage.get_item("is_guessing")? {
+                if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
+                    self.is_guessing = is_guessing;
+                }
+            }
+
+            if let Some(is_winner_str) = local_storage.get_item("is_winner")? {
+                if let Ok(is_winner) = is_winner_str.parse::<bool>() {
+                    self.is_winner = is_winner;
+                }
+            }
+
+            if let Some(guesses_str) = local_storage.get_item("guesses")? {
+                let previous_guesses = guesses_str
+                    .split(',')
+                    .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
+
+                for (guess_index, guess) in previous_guesses.enumerate() {
+                    self.guesses[guess_index] = guess;
+                    self.current_guess = guess_index;
+                    self.submit_current_guess();
+                }
+            }
+
+            if let Some(current_guess_str) = local_storage.get_item("current_guess")? {
+                if let Ok(current_guess) = current_guess_str.parse::<usize>() {
+                    self.current_guess = current_guess;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn rehydrate(&mut self) -> Result<(), JsValue> {
+        let window: Window = window().expect("window not available");
+        if let Some(local_storage) = window.local_storage().expect("local storage not available") {
+            // Common state
+            if let Some(game_mode_str) = local_storage.get_item("game_mode")? {
+                if let Ok(new_mode) = game_mode_str.parse::<GameMode>() {
+                    // self.previous_game_mode = mem::replace(&mut self.game_mode, new_mode);
+                }
+            }
+
+            if let Some(daily_word_history_str) = local_storage.get_item("daily_word_history")? {
+                if daily_word_history_str.len() != 0 {
+                    daily_word_history_str.split(',').for_each(|date_str| {
+                        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
+                        let daily_item = local_storage
+                            .get_item(&format!("daily_word_history[{}]", date_str))
+                            .unwrap();
+                        if let Some(daily_str) = daily_item {
+                            let parts = daily_str.split('|').collect::<Vec<&str>>();
+
+                            // AIVAN|2022-01-07|KOIRA,AVAIN,AIVAN,,,|2|true|true
+                            let word = parts[0];
+                            let guesses = parts[2]
+                                .split(',')
+                                .map(|guess| guess.chars().collect::<Vec<_>>())
+                                .collect::<Vec<_>>();
+                            let current_guess = parts[3].parse::<usize>().unwrap();
+                            let is_guessing = parts[4].parse::<bool>().unwrap();
+                            let is_winner = parts[5].parse::<bool>().unwrap();
+
+                            let history = DailyWordHistory {
+                                word: word.to_string(),
+                                date,
+                                guesses: guesses,
+                                current_guess: current_guess,
+                                is_guessing: is_guessing,
+                                is_winner: is_winner,
+                            };
+
+                            self.daily_word_history.insert(date, history);
+                        }
+                    });
+                }
+            }
+
+            if let Some(message_str) = local_storage.get_item("message")? {
+                // self.message = message_str;
+            }
+
+            // Stats
+            if let Some(streak_str) = local_storage.get_item("streak")? {
+                if let Ok(streak) = streak_str.parse::<usize>() {
+                    // self.streak = streak;
+                }
+            }
+
+            if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
+                if let Ok(max_streak) = max_streak_str.parse::<usize>() {
+                    self.max_streak = max_streak;
+                }
+            }
+
+            if let Some(total_played_str) = local_storage.get_item("total_played")? {
+                if let Ok(total_played) = total_played_str.parse::<usize>() {
+                    self.total_played = total_played;
+                }
+            }
+
+            if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
+                if let Ok(total_solved) = total_solved_str.parse::<usize>() {
+                    self.total_solved = total_solved;
+                }
+            }
+
+            // Gamemode specific
+            match self.current_game_mode {
+                GameMode::DailyWord => {
+                    self.rehydrate_daily_word();
+                }
+                GameMode::Classic | GameMode::Relay => {
+                    self.rehydrate_game()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+    */
+}
+
+#[derive(Clone, PartialEq)]
+pub struct Game {
+    pub game_mode: GameMode,
+    pub word_list: WordList,
+    pub word_length: usize,
+    pub max_guesses: usize,
+
+    pub word: Vec<char>,
+
+    pub is_guessing: bool,
+    pub is_winner: bool,
+    pub is_unknown: bool,
+    pub is_reset: bool,
+    pub message: String,
+
+    pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
+    pub discovered_counts: Vec<HashMap<char, CharacterCount>>,
+    pub guesses: Vec<Vec<(char, TileState)>>,
+    pub previous_guesses: Vec<Vec<(char, TileState)>>,
+    pub current_guess: usize,
+
+    pub game_manager: Rc<RefCell<GameManager>>,
+
+    pub streak: usize,
+}
+
+impl Game {
+    pub fn new(
+        game_mode: GameMode,
+        word_list: WordList,
+        word_length: usize,
+        word: Vec<char>,
+        game_manager: Rc<RefCell<GameManager>>,
+    ) -> Self {
+        let max_guesses = DEFAULT_MAX_GUESSES;
 
         let guesses = std::iter::repeat(Vec::with_capacity(word_length))
             .take(max_guesses)
@@ -247,39 +791,25 @@ impl State {
             .collect::<Vec<_>>();
 
         Self {
-            word,
-
-            word_lists,
-            current_word_list,
-            allow_profanities,
-
+            game_mode,
+            word_list,
             word_length,
             max_guesses,
-
+            word,
             is_guessing: true,
             is_winner: false,
             is_unknown: false,
             is_reset: false,
-
-            theme: Theme::Dark,
-
-            daily_word_history: HashMap::new(),
-
-            game_mode: GameMode::Classic,
-            previous_game_mode: GameMode::Classic,
-
             message: EMPTY.to_string(),
-
             known_states,
             discovered_counts,
-
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
+
+            game_manager,
+
             streak: 0,
-            max_streak: 0,
-            total_played: 0,
-            total_solved: 0,
         }
     }
 
@@ -390,7 +920,7 @@ impl State {
         }
     }
 
-    pub fn submit_current_guess(&mut self) {
+    fn submit_current_guess(&mut self) {
         for (index, (character, _)) in self.guesses[self.current_guess].iter().enumerate() {
             let known = self.known_states[self.current_guess]
                 .entry((*character, index))
@@ -456,8 +986,10 @@ impl State {
 
         self.clear_message();
 
-        let tile_state =
-            self.current_guess_state(character, self.guesses[self.current_guess].len());
+        let tile_state = self.current_guess_state(
+            character,
+            self.guesses[self.current_guess].len(),
+        );
         self.guesses[self.current_guess].push((character, tile_state));
         true
     }
@@ -478,7 +1010,7 @@ impl State {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self.word_lists.get(&(WordList::Full, self.word_length)) {
+        match self.game_manager.borrow().word_lists.get(&(WordList::Full, self.word_length)) {
             Some(list) => {
                 let word: &Vec<char> = &self.guesses[self.current_guess]
                     .iter()
@@ -526,41 +1058,6 @@ impl State {
         }
     }
 
-    fn set_daily_word_history(&mut self, date: &NaiveDate) {
-        self.daily_word_history.insert(
-            *date,
-            DailyWordHistory {
-                word: self.word.iter().collect(),
-                date: *date,
-                guesses: self
-                    .guesses
-                    .iter()
-                    .map(|guess| guess.iter().map(|(c, _)| *c).collect())
-                    .collect(),
-                current_guess: self.current_guess,
-                is_guessing: self.is_guessing,
-                is_winner: self.is_winner,
-            },
-        );
-    }
-
-    fn set_game_statistics(&mut self) {
-        self.total_played += 1;
-
-        if self.is_winner {
-            self.total_solved += 1;
-
-            if self.game_mode != GameMode::DailyWord {
-                self.streak += 1;
-                if self.streak > self.max_streak {
-                    self.max_streak = self.streak;
-                }
-            }
-        } else {
-            self.streak = 0;
-        }
-    }
-
     pub fn submit_guess(&mut self) -> bool {
         if !self.is_guess_allowed() {
             self.message = "Liian vähän kirjaimia!".to_owned();
@@ -580,467 +1077,32 @@ impl State {
         if self.is_game_ended() {
             self.is_guessing = false;
 
-            self.set_game_statistics();
+            if self.game_mode != GameMode::DailyWord {
+                if self.is_winner {
+                    self.streak += 1;
+                } else {
+                    self.streak = 0;
+                }
+
+                self.game_manager.borrow_mut().update_game_statistics(self.is_winner, self.streak);
+            }
+
             self.set_game_end_message();
 
-            let _result = self.persist_stats();
+            let _result = self.game_manager.borrow().persist_stats();
         } else {
             self.current_guess += 1;
         }
 
         if self.game_mode == GameMode::DailyWord {
             let today = Local::now().naive_local().date();
-            self.set_daily_word_history(&today);
+            // self.set_daily_word_history(&today);
 
-            let _result = self.persist_single_daily_word(&today);
+            let _result = self.game_manager.borrow().persist_single_daily_word(&today);
         } else {
-            let _result = self.persist_game();
+            let _result = self.game_manager.borrow().persist_game(self);
         }
 
         true
-    }
-
-    pub fn get_random_word(
-        word_lists: &HashMap<(WordList, usize), HashSet<Vec<char>>>,
-        current: WordList,
-        word_length: usize,
-        allow_profanities: bool,
-    ) -> Vec<char> {
-        let mut words = word_lists
-            .get(&(current, word_length))
-            .unwrap()
-            .iter()
-            .collect::<Vec<_>>();
-
-        if !allow_profanities {
-            if let Some(profanities) = word_lists.get(&(WordList::Profanities, word_length)) {
-                words.retain(|word| !profanities.contains(*word));
-            }
-        }
-
-        let chosen = words.choose(&mut rand::thread_rng()).unwrap();
-        (*chosen).clone()
-    }
-
-    pub fn get_daily_word_index(&self) -> usize {
-        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        Local::now()
-            .naive_local()
-            .date()
-            .signed_duration_since(epoch)
-            .num_days() as usize
-    }
-
-    pub fn get_daily_word(&self) -> Vec<char> {
-        DAILY_WORDS
-            .lines()
-            .nth(self.get_daily_word_index())
-            .unwrap()
-            .chars()
-            .collect()
-    }
-
-    pub fn create_new_game(&mut self) -> bool {
-        let next_word = if self.game_mode == GameMode::DailyWord {
-            self.get_daily_word()
-        } else {
-            State::get_random_word(
-                &self.word_lists,
-                self.current_word_list,
-                self.word_length,
-                self.allow_profanities,
-            )
-        };
-
-        let previous_word = mem::replace(&mut self.word, next_word);
-
-        if previous_word.len() <= self.word_length {
-            self.previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses.truncate(self.current_guess);
-        } else {
-            let previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses = previous_guesses
-                .into_iter()
-                .map(|guess| guess.into_iter().take(self.word_length).collect())
-                .collect();
-            self.previous_guesses.truncate(self.current_guess);
-        }
-
-        self.guesses = Vec::with_capacity(self.max_guesses);
-
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-        self.discovered_counts = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        if previous_word.len() == self.word_length
-            && self.is_winner
-            && self.game_mode == GameMode::Relay
-        {
-            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses - 1)
-                .collect::<Vec<_>>();
-
-            self.guesses.push(
-                previous_word
-                    .iter()
-                    .map(|c| (*c, TileState::Unknown))
-                    .collect(),
-            );
-            self.guesses.extend(empty_guesses);
-
-            self.current_guess = 0;
-            self.submit_current_guess();
-            self.current_guess = 1;
-        } else {
-            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses)
-                .collect::<Vec<_>>();
-            self.current_guess = 0;
-        }
-
-        self.is_guessing = true;
-        self.is_winner = false;
-        self.is_reset = true;
-        self.clear_message();
-
-        if self.game_mode == GameMode::DailyWord {
-            let today = Local::now().naive_local().date();
-            if let Some(solve) = self.daily_word_history.get(&today).cloned() {
-                for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                    self.guesses[guess_index] =
-                        guess.iter().map(|c| (*c, TileState::Unknown)).collect();
-                    self.current_guess = guess_index;
-                    self.submit_current_guess();
-                }
-                self.is_winner = solve.is_winner;
-                self.is_guessing = solve.is_guessing;
-                self.current_guess = solve.current_guess;
-            }
-
-            if !self.is_guessing {
-                self.message = "Uusi sanuli huomenna!".to_owned();
-            }
-        } else {
-            let _result = self.persist_game();
-        }
-
-        true
-    }
-
-    pub fn change_word_length(&mut self, new_length: usize) {
-        self.word_length = new_length;
-
-        // TODO: Store streaks for every word length separately
-
-        if self.game_mode == GameMode::DailyWord {
-            self.game_mode = GameMode::Classic;
-        }
-    }
-
-    pub fn change_game_mode(&mut self, new_mode: GameMode) {
-        self.previous_game_mode = std::mem::replace(&mut self.game_mode, new_mode);
-        self.message = EMPTY.to_string();
-        let _result = self.persist_settings();
-
-        if self.game_mode == GameMode::DailyWord {
-            self.word_length = 5;
-        }
-    }
-
-    pub fn change_word_list(&mut self, new_list: WordList) {
-        self.current_word_list = new_list;
-        self.message = EMPTY.to_string();
-        let _result = self.persist_settings();
-    }
-
-    pub fn change_allow_profanities(&mut self, is_allowed: bool) {
-        self.allow_profanities = is_allowed;
-        let _result = self.persist_settings();
-    }
-
-    pub fn change_theme(&mut self, theme: Theme) -> bool {
-        self.theme = theme;
-        let _result = self.persist_settings();
-        true
-    }
-
-    // Persisting & restoring game state
-
-    fn persist_settings(&mut self) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        let local_storage = window.local_storage().expect("local storage not available");
-        if let Some(local_storage) = local_storage {
-            local_storage.set_item("game_mode", &self.game_mode.to_string())?;
-            local_storage.set_item("word_length", format!("{}", self.word_length).as_str())?;
-            local_storage.set_item("word_list", format!("{}", self.current_word_list).as_str())?;
-            local_storage.set_item("allow_profanities", format!("{}", self.allow_profanities).as_str())?;
-            local_storage.set_item("theme", format!("{}", self.theme).as_str())?;
-        }
-
-        Ok(())
-    }
-
-    fn persist_stats(&self) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        let local_storage = window.local_storage().expect("local storage not available");
-        if let Some(local_storage) = local_storage {
-            local_storage.set_item("streak", &format!("{}", self.streak))?;
-            local_storage.set_item("max_streak", &format!("{}", self.max_streak))?;
-            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
-            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
-        }
-
-        Ok(())
-    }
-
-    fn persist_game(&self) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        let local_storage = window.local_storage().expect("local storage not available");
-        if let Some(local_storage) = local_storage {
-            local_storage.set_item("word", &self.word.iter().collect::<String>())?;
-            local_storage.set_item("word_length", &format!("{}", self.word_length))?;
-            local_storage.set_item("current_guess", &format!("{}", self.current_guess))?;
-            local_storage.set_item(
-                "guesses",
-                &self
-                    .guesses
-                    .iter()
-                    .map(|guess| guess.iter().map(|(c, _)| c).collect::<String>())
-                    .collect::<Vec<String>>()
-                    .join(","),
-            )?;
-            local_storage.set_item("message", &self.message)?;
-            local_storage.set_item("is_guessing", format!("{}", self.is_guessing).as_str())?;
-            local_storage.set_item("is_winner", format!("{}", self.is_winner).as_str())?;
-        }
-
-        Ok(())
-    }
-
-    fn persist_single_daily_word(&self, date: &NaiveDate) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        let local_storage = window.local_storage().expect("local storage not available");
-
-        if let Some(local_storage) = local_storage {
-            if let Some(history) = self.daily_word_history.get(date) {
-                local_storage.set_item(
-                    &format!("daily_word_history[{}]", date.format("%Y-%m-%d")),
-                    &format!(
-                        "{}|{}|{}|{}|{}|{}",
-                        history.word,
-                        history.date.format("%Y-%m-%d"),
-                        history
-                            .guesses
-                            .iter()
-                            .map(|guess| guess.iter().collect::<String>())
-                            .collect::<Vec<_>>()
-                            .join(","),
-                        history.current_guess,
-                        history.is_guessing,
-                        history.is_winner
-                    ),
-                )?;
-            }
-
-            local_storage.set_item(
-                "daily_word_history",
-                &format!(
-                    "{}",
-                    &self
-                        .daily_word_history
-                        .keys()
-                        .map(|date| date.format("%Y-%m-%d").to_string())
-                        .collect::<Vec<_>>()
-                        .join(",")
-                ),
-            )?;
-
-            local_storage.set_item("total_played", &format!("{}", self.total_played))?;
-            local_storage.set_item("total_solved", &format!("{}", self.total_solved))?;
-        }
-
-        Ok(())
-    }
-
-    fn rehydrate_daily_word(&mut self) {
-        self.word = self.get_daily_word();
-        self.word_length = self.word.len();
-
-        let today = Local::now().naive_local().date();
-        if let Some(solve) = self.daily_word_history.get(&today).cloned() {
-            for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                self.guesses[guess_index] =
-                    guess.iter().map(|c| (*c, TileState::Unknown)).collect();
-                self.current_guess = guess_index;
-                self.submit_current_guess();
-            }
-            self.is_guessing = solve.is_guessing;
-            self.is_winner = solve.is_winner;
-            self.current_guess = solve.current_guess;
-
-            if !self.is_guessing {
-                self.message = "Uusi sanuli huomenna!".to_owned();
-            } else {
-                self.message = EMPTY.to_string()
-            }
-        }
-    }
-
-    fn rehydrate_game(&mut self) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        if let Some(local_storage) = window.local_storage()? {
-            if let Some(word_list_str) = local_storage.get_item("word_list")? {
-                if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                    self.current_word_list = word_list;
-                }
-            }
-
-            if let Some(word_length_str) = local_storage.get_item("word_length")? {
-                if let Ok(word_length) = word_length_str.parse::<usize>() {
-                    self.word_length = word_length;
-                }
-            }
-
-            if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
-                if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
-                    self.allow_profanities = allow_profanities;
-                }
-            }
-
-            if let Some(theme_str) = local_storage.get_item("theme")? {
-                if let Ok(theme) = theme_str.parse::<Theme>() {
-                    self.theme = theme;
-                }
-            }
-
-            if let Some(word) = local_storage.get_item("word")? {
-                self.word = word.chars().collect();
-            } else {
-                local_storage.set_item("word", &self.word.iter().collect::<String>())?;
-            }
-
-            if let Some(is_guessing_str) = local_storage.get_item("is_guessing")? {
-                if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
-                    self.is_guessing = is_guessing;
-                }
-            }
-
-            if let Some(is_winner_str) = local_storage.get_item("is_winner")? {
-                if let Ok(is_winner) = is_winner_str.parse::<bool>() {
-                    self.is_winner = is_winner;
-                }
-            }
-
-            if let Some(guesses_str) = local_storage.get_item("guesses")? {
-                let previous_guesses = guesses_str
-                    .split(',')
-                    .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
-
-                for (guess_index, guess) in previous_guesses.enumerate() {
-                    self.guesses[guess_index] = guess;
-                    self.current_guess = guess_index;
-                    self.submit_current_guess();
-                }
-            }
-
-            if let Some(current_guess_str) = local_storage.get_item("current_guess")? {
-                if let Ok(current_guess) = current_guess_str.parse::<usize>() {
-                    self.current_guess = current_guess;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn rehydrate(&mut self) -> Result<(), JsValue> {
-        let window: Window = window().expect("window not available");
-        if let Some(local_storage) = window.local_storage().expect("local storage not available") {
-            // Common state
-            if let Some(game_mode_str) = local_storage.get_item("game_mode")? {
-                if let Ok(new_mode) = game_mode_str.parse::<GameMode>() {
-                    self.previous_game_mode = mem::replace(&mut self.game_mode, new_mode);
-                }
-            }
-
-            if let Some(daily_word_history_str) = local_storage.get_item("daily_word_history")? {
-                if daily_word_history_str.len() != 0 {
-                    daily_word_history_str.split(',').for_each(|date_str| {
-                        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
-                        let daily_item = local_storage
-                            .get_item(&format!("daily_word_history[{}]", date_str))
-                            .unwrap();
-                        if let Some(daily_str) = daily_item {
-                            let parts = daily_str.split('|').collect::<Vec<&str>>();
-
-                            // AIVAN|2022-01-07|KOIRA,AVAIN,AIVAN,,,|2|true|true
-                            let word = parts[0];
-                            let guesses = parts[2]
-                                .split(',')
-                                .map(|guess| guess.chars().collect::<Vec<_>>())
-                                .collect::<Vec<_>>();
-                            let current_guess = parts[3].parse::<usize>().unwrap();
-                            let is_guessing = parts[4].parse::<bool>().unwrap();
-                            let is_winner = parts[5].parse::<bool>().unwrap();
-
-                            let history = DailyWordHistory {
-                                word: word.to_string(),
-                                date,
-                                guesses: guesses,
-                                current_guess: current_guess,
-                                is_guessing: is_guessing,
-                                is_winner: is_winner,
-                            };
-
-                            self.daily_word_history.insert(date, history);
-                        }
-                    });
-                }
-            }
-
-            if let Some(message_str) = local_storage.get_item("message")? {
-                self.message = message_str;
-            }
-
-            // Stats
-            if let Some(streak_str) = local_storage.get_item("streak")? {
-                if let Ok(streak) = streak_str.parse::<usize>() {
-                    self.streak = streak;
-                }
-            }
-
-            if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
-                if let Ok(max_streak) = max_streak_str.parse::<usize>() {
-                    self.max_streak = max_streak;
-                }
-            }
-
-            if let Some(total_played_str) = local_storage.get_item("total_played")? {
-                if let Ok(total_played) = total_played_str.parse::<usize>() {
-                    self.total_played = total_played;
-                }
-            }
-
-            if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
-                if let Ok(total_solved) = total_solved_str.parse::<usize>() {
-                    self.total_solved = total_solved;
-                }
-            }
-
-            // Gamemode specific
-            match self.game_mode {
-                GameMode::DailyWord => {
-                    self.rehydrate_daily_word();
-                }
-                GameMode::Classic | GameMode::Relay => {
-                    self.rehydrate_game()?;
-                }
-            }
-        }
-
-        Ok(())
     }
 }

@@ -54,11 +54,11 @@ impl Component for App {
             keyboard_listener: None,
         };
 
-        if initial_state.state.rehydrate().is_err() {
-            // Reinitialize and just continue with defaults
-            initial_state.state =
-                State::new();
-        }
+        // if initial_state.state.rehydrate().is_err() {
+        //     // Reinitialize and just continue with defaults
+        //     initial_state.state =
+        //         State::new();
+        // }
 
         initial_state
     }
@@ -111,13 +111,13 @@ impl Component for App {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::KeyPress(c) => self.state.push_character(c),
-            Msg::Backspace => self.state.pop_character(),
+            Msg::KeyPress(c) => self.state.game.push_character(c),
+            Msg::Backspace => self.state.game.pop_character(),
             Msg::Enter => {
                 let link = ctx.link();
 
-                if !self.state.is_guessing {
-                    if self.state.game_mode == GameMode::DailyWord {
+                if !self.state.game.is_guessing {
+                    if self.state.game.game_mode == GameMode::DailyWord {
                         link.send_message(Msg::ChangePreviousGameMode);
                     } else {
                         link.send_message(Msg::NewGame);
@@ -128,7 +128,7 @@ impl Component for App {
 
                 true
             }
-            Msg::Guess => self.state.submit_guess(),
+            Msg::Guess => self.state.game.submit_guess(),
             Msg::NewGame => self.state.create_new_game(),
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
@@ -141,35 +141,35 @@ impl Component for App {
                 true
             }
             Msg::ChangeWordLength(new_length) => {
-                self.state.change_word_length(new_length);
+                self.state.game_manager.borrow_mut().change_word_length(new_length);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
             }
             Msg::ChangeGameMode(new_mode) => {
-                self.state.change_game_mode(new_mode);
+                self.state.game_manager.borrow_mut().change_game_mode(new_mode);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
             }
             Msg::ChangePreviousGameMode => {
-                self.state.change_game_mode(self.state.previous_game_mode.clone());
+                self.state.game_manager.borrow_mut().change_game_mode(self.state.game_manager.borrow().previous_game_mode);
                 self.state.create_new_game()
             }
             Msg::ChangeWordList(list) => {
-                self.state.change_word_list(list);
+                self.state.game_manager.borrow_mut().change_word_list(list);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 self.state.create_new_game()
             }
             Msg::ChangeAllowProfanities(is_allowed) => {
-                self.state.change_allow_profanities(is_allowed);
+                self.state.game_manager.borrow_mut().change_allow_profanities(is_allowed);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 true
             },
             Msg::ChangeTheme(theme) => {
-                self.state.change_theme(theme);
+                self.state.game_manager.borrow_mut().change_theme(theme);
                 true
             }
         }
@@ -180,43 +180,45 @@ impl Component for App {
 
         let keyboard_state = ALLOWED_KEYS
             .iter()
-            .map(|key| (*key, self.state.keyboard_tilestate(key)))
+            .map(|key| (*key, self.state.game.keyboard_tilestate(key)))
             .collect::<HashMap<char, TileState>>();
 
-        let word = self.state.word.iter().collect::<String>();
+        let word = self.state.game.word.iter().collect::<String>();
 
-        let last_guess = self.state.guesses[self.state.current_guess]
+        let last_guess = self.state.game.guesses[self.state.game.current_guess]
             .iter()
             .map(|(c, _)| c)
             .collect::<String>();
 
+        let game_manager = self.state.game_manager.borrow();
+
         html! {
-            <div class={classes!("game", self.state.theme.to_string())}>
+            <div class={classes!("game", game_manager.theme.to_string())}>
                 <Header
                     on_toggle_help_cb={link.callback(|_| Msg::ToggleHelp)}
                     on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
-                    streak={self.state.streak}
-                    game_mode={self.state.game_mode}
-                    daily_word_number={self.state.get_daily_word_index() + 1}
+                    streak={self.state.game.streak}
+                    game_mode={self.state.game.game_mode}
+                    daily_word_number={game_manager.get_daily_word_index() + 1}
                 />
 
                 <Board
-                    is_guessing={self.state.is_guessing}
-                    is_reset={self.state.is_reset}
-                    guesses={self.state.guesses.clone()}
-                    previous_guesses={self.state.previous_guesses.clone()}
-                    current_guess={self.state.current_guess}
-                    max_guesses={self.state.max_guesses}
-                    word_length={self.state.word_length}
+                    is_guessing={self.state.game.is_guessing}
+                    is_reset={self.state.game.is_reset}
+                    guesses={self.state.game.guesses.clone()}
+                    previous_guesses={self.state.game.previous_guesses.clone()}
+                    current_guess={self.state.game.current_guess}
+                    max_guesses={self.state.game.max_guesses}
+                    word_length={self.state.game.word_length}
                 />
 
                 <Keyboard
                     callback={link.callback(move |msg| msg)}
-                    is_unknown={self.state.is_unknown}
-                    is_winner={self.state.is_winner}
-                    is_guessing={self.state.is_guessing}
-                    game_mode={self.state.game_mode}
-                    message={self.state.message.clone()}
+                    is_unknown={self.state.game.is_unknown}
+                    is_winner={self.state.game.is_winner}
+                    is_guessing={self.state.game.is_guessing}
+                    game_mode={self.state.game.game_mode}
+                    message={self.state.game.message.clone()}
                     word={word}
                     last_guess={last_guess}
                     keyboard={keyboard_state}
@@ -235,14 +237,14 @@ impl Component for App {
                         html! {
                             <MenuModal
                                 callback={link.callback(move |msg| msg)}
-                                game_mode={self.state.game_mode}
-                                word_length={self.state.word_length}
-                                current_word_list={self.state.current_word_list}
-                                allow_profanities={self.state.allow_profanities}
-                                theme={self.state.theme}
-                                max_streak={self.state.max_streak}
-                                total_played={self.state.total_played}
-                                total_solved={self.state.total_solved}
+                                game_mode={game_manager.current_game_mode}
+                                word_length={game_manager.current_word_length}
+                                current_word_list={game_manager.current_word_list}
+                                allow_profanities={game_manager.allow_profanities}
+                                theme={game_manager.theme}
+                                max_streak={game_manager.max_streak}
+                                total_played={game_manager.total_played}
+                                total_solved={game_manager.total_solved}
                             />
                         }
                     } else {
