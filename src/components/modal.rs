@@ -48,16 +48,19 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
     
             <p>
-                {"Arvattaviin sanoihin käytetyn sanalistan voi valita asetuksista. Molempien sanalistojen pohjana on Kotimaisten kielten keskuksen (Kotus) julkaisema "}
+                {"Arvattaviin sanoihin käytetyn sanulistan voi valita asetuksista. Sanulistojen pohjana olivat Kotimaisten kielten keskuksen (Kotus) julkaiseman "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoitu nykysuomen sanalista, josta on poimittu ne sanat, jotka sisältävät vain kirjaimia A-Ö. Suppealla listalla on näistä
-                karsittu harvinaisemmat laina- ja murressanat, sekä muut erikoisuudet. Sanat ovat enimmäkseen perusmuodossa."}
+                {" lisensoidun nykysuomen sanulistan sanat. Suppealla listalla on näistä mielivaltaisesti karsittu kaikki harvinaisemmat laina- ja murressanat
+                sekä muut erikoisuudet pois. Laajalla listalla ei tätä karsintaa ole tehty, ja listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia."}
             </p>
             <p>
-                {"Päivän sanulin sanat tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla sama kaikille pelaajille tiettynä päivänä."}
+                {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin kirjakieltä."}
             </p>
             <p>
-                {"Sanalistoja muokataan jatkuvasti käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
+                {"Päivän sanulit tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla aina sama kaikille pelaajille tiettynä päivänä."}
+            </p>
+            <p>
+                {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {"."}
             </p>
