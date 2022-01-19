@@ -232,16 +232,19 @@ impl State {
     }
 
     pub fn change_previous_game_mode(&mut self) {
+        let (game_mode, word_list, word_length) = self.game_manager.borrow().previous_game;
+
         self.game_manager
             .borrow_mut()
-            .change_game_mode(self.game_manager.borrow().previous_game.0);
+            .change_game_mode(game_mode);
         self.game_manager
             .borrow_mut()
-            .change_word_list(self.game_manager.borrow().previous_game.1);
+            .change_word_list(word_list);
         self.game_manager
             .borrow_mut()
-            .change_word_length(self.game_manager.borrow().previous_game.2);
+            .change_word_length(word_length);
         self.switch_active_game();
+
         let _res = self.game_manager.borrow_mut().persist_game(&self.game);
     }
 
