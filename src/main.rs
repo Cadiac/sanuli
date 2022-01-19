@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
+use chrono::{Local, NaiveDate};
 
 mod components;
 mod state;
@@ -24,7 +25,7 @@ pub enum Msg {
     Backspace,
     Enter,
     Guess,
-    NewGame,
+    NextWord,
     ToggleHelp,
     ToggleMenu,
     ChangeGameMode(GameMode),
@@ -117,10 +118,10 @@ impl Component for App {
                 let link = ctx.link();
 
                 if !self.state.game.is_guessing {
-                    if self.state.game.game_mode == GameMode::DailyWord {
+                    if let GameMode::DailyWord(_) = self.state.game.game_mode {
                         link.send_message(Msg::ChangePreviousGameMode);
                     } else {
-                        link.send_message(Msg::NewGame);
+                        link.send_message(Msg::NextWord);
                     }
                 } else {
                     link.send_message(Msg::Guess);
@@ -129,7 +130,7 @@ impl Component for App {
                 true
             }
             Msg::Guess => self.state.game.submit_guess(),
-            Msg::NewGame => self.state.create_new_game(),
+            Msg::NextWord => self.state.game.next_word(),
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
@@ -144,23 +145,25 @@ impl Component for App {
                 self.state.game_manager.borrow_mut().change_word_length(new_length);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                self.state.create_new_game()
+                self.state.switch_active_game()
             }
             Msg::ChangeGameMode(new_mode) => {
                 self.state.game_manager.borrow_mut().change_game_mode(new_mode);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                self.state.create_new_game()
+                self.state.switch_active_game()
             }
             Msg::ChangePreviousGameMode => {
-                self.state.game_manager.borrow_mut().change_game_mode(self.state.game_manager.borrow().previous_game_mode);
-                self.state.create_new_game()
+                self.state.game_manager.borrow_mut().change_game_mode(self.state.game_manager.borrow().previous_game.0);
+                self.state.game_manager.borrow_mut().change_word_list(self.state.game_manager.borrow().previous_game.1);
+                self.state.game_manager.borrow_mut().change_word_length(self.state.game_manager.borrow().previous_game.2);
+                self.state.switch_active_game()
             }
             Msg::ChangeWordList(list) => {
                 self.state.game_manager.borrow_mut().change_word_list(list);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                self.state.create_new_game()
+                self.state.switch_active_game()
             }
             Msg::ChangeAllowProfanities(is_allowed) => {
                 self.state.game_manager.borrow_mut().change_allow_profanities(is_allowed);
@@ -191,6 +194,7 @@ impl Component for App {
             .collect::<String>();
 
         let game_manager = self.state.game_manager.borrow();
+        let today = Local::now().naive_local().date();
 
         html! {
             <div class={classes!("game", game_manager.theme.to_string())}>
@@ -199,7 +203,7 @@ impl Component for App {
                     on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
                     streak={self.state.game.streak}
                     game_mode={self.state.game.game_mode}
-                    daily_word_number={game_manager.get_daily_word_index() + 1}
+                    daily_word_number={game_manager.get_daily_word_index(today) + 1}
                 />
 
                 <Board

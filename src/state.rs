@@ -1,10 +1,10 @@
 use rand::seq::SliceRandom;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
-use std::cell::{RefCell, RefMut};
 use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
@@ -88,7 +88,7 @@ impl fmt::Display for WordList {
 pub enum GameMode {
     Classic,
     Relay,
-    DailyWord,
+    DailyWord(NaiveDate),
 }
 
 impl FromStr for GameMode {
@@ -98,7 +98,10 @@ impl FromStr for GameMode {
         match input {
             "classic" => Ok(GameMode::Classic),
             "relay" => Ok(GameMode::Relay),
-            "daily_word" => Ok(GameMode::DailyWord),
+            "daily_word" => {
+                let today = Local::now().naive_local().date();
+                Ok(GameMode::DailyWord(today))
+            }
             _ => Err(()),
         }
     }
@@ -109,7 +112,7 @@ impl fmt::Display for GameMode {
         match self {
             GameMode::Classic => write!(f, "classic"),
             GameMode::Relay => write!(f, "relay"),
-            GameMode::DailyWord => write!(f, "daily_word"),
+            GameMode::DailyWord(_) => write!(f, "daily_word"),
         }
     }
 }
@@ -194,11 +197,10 @@ impl State {
     pub fn new() -> Self {
         let game_manager = Rc::new(RefCell::new(GameManager::new()));
         let game = Game::new(
-            GameMode::Classic,
-            WordList::Full,
-            DEFAULT_WORD_LENGTH,
-            vec!['V', 'I', 'R', 'H', 'E'],
-            game_manager.clone()
+            game_manager.borrow().current_game_mode,
+            game_manager.borrow().current_word_list,
+            game_manager.borrow().current_word_length,
+            game_manager.clone(),
         );
         let background_games = HashMap::new();
 
@@ -209,99 +211,48 @@ impl State {
         }
     }
 
-    // pub fn switch_game(&self) -> &Game {
-    //     self.games
-    //         .get(&(
-    //             self.game_manager.current_game_mode,
-    //             self.game_manager.current_word_list,
-    //             self.game_manager.current_word_length,
-    //         ))
-    //         .unwrap()
-    // }
+    pub fn switch_active_game(&mut self) -> bool {
+        let next_game = (
+            self.game_manager.borrow().current_game_mode,
+            self.game_manager.borrow().current_word_list,
+            self.game_manager.borrow().current_word_length,
+        );
 
-    pub fn create_new_game(&mut self) -> bool {
-        let next_word = if self.game_manager.borrow().current_game_mode == GameMode::DailyWord {
-            self.game_manager.borrow().get_daily_word()
-        } else {
-            self.game_manager.borrow().get_random_word()
-        };
+        let previous_game = (
+            self.game.game_mode,
+            self.game.word_list,
+            self.game.word_length
+        );
 
-        /*
-        let previous_word = mem::replace(&mut self.word, next_word);
+        self.game_manager.borrow_mut().previous_game = previous_game;
 
-        if previous_word.len() <= self.word_length {
-            self.previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses.truncate(self.current_guess);
-        } else {
-            let previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses = previous_guesses
-                .into_iter()
-                .map(|guess| guess.into_iter().take(self.word_length).collect())
-                .collect();
-            self.previous_guesses.truncate(self.current_guess);
-        }
-
-        self.guesses = Vec::with_capacity(self.max_guesses);
-
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-        self.discovered_counts = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        if previous_word.len() == self.word_length
-            && self.is_winner
-            && self.game_mode == GameMode::Relay
-        {
-            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses - 1)
-                .collect::<Vec<_>>();
-
-            self.guesses.push(
-                previous_word
-                    .iter()
-                    .map(|c| (*c, TileState::Unknown))
-                    .collect(),
+        if let Some(game) = self.background_games.remove(&next_game) {
+            // There was a suspended game, restore that suspending previous
+            self.background_games.insert(
+                previous_game,
+                mem::replace(&mut self.game, game),
             );
-            self.guesses.extend(empty_guesses);
-
-            self.current_guess = 0;
-            self.submit_current_guess();
-            self.current_guess = 1;
         } else {
-            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses)
-                .collect::<Vec<_>>();
-            self.current_guess = 0;
+            // There was no suspended game from before - create a new one
+            let suspended_game = mem::replace(
+                &mut self.game,
+                Game::new(
+                    next_game.0,
+                    next_game.1,
+                    next_game.2,
+                    self.game_manager.clone(),
+                ),
+            );
+
+            self.background_games.insert(
+                (
+                    suspended_game.game_mode,
+                    suspended_game.word_list,
+                    suspended_game.word_length,
+                ),
+                suspended_game,
+            );
         }
-
-        self.is_guessing = true;
-        self.is_winner = false;
-        self.is_reset = true;
-        self.clear_message();
-
-        if self.game_mode == GameMode::DailyWord {
-            let today = Local::now().naive_local().date();
-            if let Some(solve) = self.game_manager.daily_word_history.get(&today).cloned() {
-                for (guess_index, guess) in solve.guesses.iter().enumerate() {
-                    self.guesses[guess_index] =
-                        guess.iter().map(|c| (*c, TileState::Unknown)).collect();
-                    self.current_guess = guess_index;
-                    self.submit_current_guess();
-                }
-                self.is_winner = solve.is_winner;
-                self.is_guessing = solve.is_guessing;
-                self.current_guess = solve.current_guess;
-            }
-
-            if !self.is_guessing {
-                self.message = "Uusi sanuli huomenna!".to_owned();
-            }
-        } else {
-            let _result = self.game_manager.persist_game(self);
-        }
-        */
 
         true
     }
@@ -312,12 +263,13 @@ pub struct GameManager {
     pub word_lists: Rc<WordLists>,
     pub allow_profanities: bool,
 
+    pub current_game_mode: GameMode,
     pub current_word_list: WordList,
     pub current_word_length: usize,
-    pub current_max_guesses: usize,
 
-    pub current_game_mode: GameMode,
-    pub previous_game_mode: GameMode,
+    pub previous_game: (GameMode, WordList, usize),
+
+    pub current_max_guesses: usize,
 
     pub theme: Theme,
     pub daily_word_history: HashMap<NaiveDate, DailyWordHistory>,
@@ -343,7 +295,7 @@ impl GameManager {
             current_max_guesses,
 
             current_game_mode: GameMode::Classic,
-            previous_game_mode: GameMode::Classic,
+            previous_game: (GameMode::Classic, WordList::Common, DEFAULT_WORD_LENGTH),
             current_word_length,
 
             theme: Theme::Dark,
@@ -355,15 +307,19 @@ impl GameManager {
         }
     }
 
-    pub fn get_random_word(&self) -> Vec<char> {    
-        let mut words = self.word_lists
-            .get(&(self.current_word_list, self.current_word_length))
+    pub fn get_random_word(&self, word_list: WordList, word_length: usize) -> Vec<char> {
+        let mut words = self
+            .word_lists
+            .get(&(word_list, word_length))
             .unwrap()
             .iter()
             .collect::<Vec<_>>();
 
         if !self.allow_profanities {
-            if let Some(profanities) = self.word_lists.get(&(WordList::Profanities, self.current_word_length)) {
+            if let Some(profanities) = self
+                .word_lists
+                .get(&(WordList::Profanities, self.current_word_length))
+            {
                 words.retain(|word| !profanities.contains(*word));
             }
         }
@@ -372,19 +328,15 @@ impl GameManager {
         (*chosen).clone()
     }
 
-    pub fn get_daily_word_index(&self) -> usize {
+    pub fn get_daily_word_index(&self, date: NaiveDate) -> usize {
         let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        Local::now()
-            .naive_local()
-            .date()
-            .signed_duration_since(epoch)
-            .num_days() as usize
+        date.signed_duration_since(epoch).num_days() as usize
     }
 
-    pub fn get_daily_word(&self) -> Vec<char> {
+    pub fn get_daily_word(&self, date: NaiveDate) -> Vec<char> {
         DAILY_WORDS
             .lines()
-            .nth(self.get_daily_word_index())
+            .nth(self.get_daily_word_index(date))
             .unwrap()
             .chars()
             .collect()
@@ -402,6 +354,7 @@ impl GameManager {
         }
     }
 
+    /*
     fn set_daily_word_history(&mut self, game: &Game, date: &NaiveDate) {
         self.daily_word_history.insert(
             *date,
@@ -419,29 +372,30 @@ impl GameManager {
             },
         );
     }
+    */
 
     pub fn change_word_length(&mut self, new_length: usize) {
         self.current_word_length = new_length;
 
-        // TODO: Store streaks for every word length separately
-
-        if self.current_game_mode == GameMode::DailyWord {
+        if let GameMode::DailyWord(_) = self.current_game_mode {
             self.current_game_mode = GameMode::Classic;
         }
     }
 
     pub fn change_game_mode(&mut self, new_mode: GameMode) {
-        self.previous_game_mode = std::mem::replace(&mut self.current_game_mode, new_mode);
-
+        self.current_game_mode = new_mode;
         let _result = self.persist_settings();
 
-        if self.current_game_mode == GameMode::DailyWord {
+        if let GameMode::DailyWord(_) = self.current_game_mode {
             self.current_word_length = 5;
+            // Normalize the wordlist for daily mode
+            self.current_word_list = WordList::Common;
         }
     }
 
     pub fn change_word_list(&mut self, new_list: WordList) {
         self.current_word_list = new_list;
+
         let _result = self.persist_settings();
     }
 
@@ -773,7 +727,6 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        word: Vec<char>,
         game_manager: Rc<RefCell<GameManager>>,
     ) -> Self {
         let max_guesses = DEFAULT_MAX_GUESSES;
@@ -789,6 +742,12 @@ impl Game {
         let discovered_counts = std::iter::repeat(HashMap::new())
             .take(max_guesses)
             .collect::<Vec<_>>();
+
+        let word = if let GameMode::DailyWord(date) = game_mode {
+            game_manager.borrow().get_daily_word(date)
+        } else {
+            game_manager.borrow().get_random_word(word_list, word_length)
+        };
 
         Self {
             game_mode,
@@ -811,6 +770,102 @@ impl Game {
 
             streak: 0,
         }
+    }
+
+    pub fn next_word(&mut self) -> bool {
+        let next_word =
+            if let GameMode::DailyWord(date) = self.game_manager.borrow().current_game_mode {
+                self.game_manager.borrow().get_daily_word(date)
+            } else {
+                self.game_manager.borrow().get_random_word(
+                    self.game_manager.borrow().current_word_list,
+                    self.game_manager.borrow().current_word_length,
+                )
+            };
+
+        let previous_word = mem::replace(&mut self.word, next_word);
+
+        if previous_word.len() <= self.word_length {
+            self.previous_guesses = mem::take(&mut self.guesses);
+            self.previous_guesses.truncate(self.current_guess);
+        } else {
+            let previous_guesses = mem::take(&mut self.guesses);
+            self.previous_guesses = previous_guesses
+                .into_iter()
+                .map(|guess| guess.into_iter().take(self.word_length).collect())
+                .collect();
+            self.previous_guesses.truncate(self.current_guess);
+        }
+
+        self.guesses = Vec::with_capacity(self.max_guesses);
+
+        self.known_states = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+        self.discovered_counts = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+
+        if previous_word.len() == self.word_length
+            && self.is_winner
+            && self.game_mode == GameMode::Relay
+        {
+            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses - 1)
+                .collect::<Vec<_>>();
+
+            self.guesses.push(
+                previous_word
+                    .iter()
+                    .map(|c| (*c, TileState::Unknown))
+                    .collect(),
+            );
+            self.guesses.extend(empty_guesses);
+
+            self.current_guess = 0;
+            self.submit_current_guess();
+            self.current_guess = 1;
+        } else {
+            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses)
+                .collect::<Vec<_>>();
+            self.current_guess = 0;
+        }
+
+        self.is_guessing = true;
+        self.is_winner = false;
+        self.is_reset = true;
+        self.clear_message();
+
+        if let GameMode::DailyWord(date) = self.game_mode {
+            // let today = Local::now().naive_local().date();
+            let previously_solved_word = self
+                .game_manager
+                .borrow()
+                .daily_word_history
+                .get(&date)
+                .cloned();
+
+            if let Some(solve) = previously_solved_word {
+                for (guess_index, guess) in solve.guesses.iter().enumerate() {
+                    self.guesses[guess_index] =
+                        guess.iter().map(|c| (*c, TileState::Unknown)).collect();
+                    self.current_guess = guess_index;
+                    self.submit_current_guess();
+                }
+                self.is_winner = solve.is_winner;
+                self.is_guessing = solve.is_guessing;
+                self.current_guess = solve.current_guess;
+            }
+
+            if !self.is_guessing {
+                self.message = "Uusi sanuli huomenna!".to_owned();
+            }
+        } else {
+            let _result = self.game_manager.borrow_mut().persist_game(self);
+        }
+
+        true
     }
 
     pub fn keyboard_tilestate(&self, key: &char) -> TileState {
@@ -986,10 +1041,8 @@ impl Game {
 
         self.clear_message();
 
-        let tile_state = self.current_guess_state(
-            character,
-            self.guesses[self.current_guess].len(),
-        );
+        let tile_state =
+            self.current_guess_state(character, self.guesses[self.current_guess].len());
         self.guesses[self.current_guess].push((character, tile_state));
         true
     }
@@ -1010,7 +1063,12 @@ impl Game {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self.game_manager.borrow().word_lists.get(&(WordList::Full, self.word_length)) {
+        match self
+            .game_manager
+            .borrow()
+            .word_lists
+            .get(&(WordList::Full, self.word_length))
+        {
             Some(list) => {
                 let word: &Vec<char> = &self.guesses[self.current_guess]
                     .iter()
@@ -1042,7 +1100,7 @@ impl Game {
 
     fn set_game_end_message(&mut self) {
         if self.is_winner {
-            if self.game_mode == GameMode::DailyWord {
+            if let GameMode::DailyWord(_) = self.game_mode {
                 self.message = format!(
                     "Löysit päivän sanulin! {}",
                     SUCCESS_EMOJIS.choose(&mut rand::thread_rng()).unwrap()
@@ -1077,14 +1135,18 @@ impl Game {
         if self.is_game_ended() {
             self.is_guessing = false;
 
-            if self.game_mode != GameMode::DailyWord {
+            if let GameMode::DailyWord(_) = self.game_mode {
+                // Do nothing?
+            } else {
                 if self.is_winner {
                     self.streak += 1;
                 } else {
                     self.streak = 0;
                 }
 
-                self.game_manager.borrow_mut().update_game_statistics(self.is_winner, self.streak);
+                self.game_manager
+                    .borrow_mut()
+                    .update_game_statistics(self.is_winner, self.streak);
             }
 
             self.set_game_end_message();
@@ -1094,11 +1156,10 @@ impl Game {
             self.current_guess += 1;
         }
 
-        if self.game_mode == GameMode::DailyWord {
-            let today = Local::now().naive_local().date();
+        if let GameMode::DailyWord(date) = self.game_mode {
+            // let today = Local::now().naive_local().date();
             // self.set_daily_word_history(&today);
-
-            let _result = self.game_manager.borrow().persist_single_daily_word(&today);
+            let _result = self.game_manager.borrow().persist_single_daily_word(&date);
         } else {
             let _result = self.game_manager.borrow().persist_game(self);
         }

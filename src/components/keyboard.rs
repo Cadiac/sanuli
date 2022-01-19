@@ -117,7 +117,7 @@ pub fn keyboard(props: &Props) -> Html {
                                 { "ARVAA" }
                             </button>
                         }
-                    } else if props.game_mode == GameMode::DailyWord {
+                    } else if let GameMode::DailyWord(_) = props.game_mode {
                         let callback = props.callback.clone();
                         let onmousedown = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();
@@ -134,7 +134,7 @@ pub fn keyboard(props: &Props) -> Html {
                         let callback = props.callback.clone();
                         let onmousedown = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();
-                            callback.emit(Msg::NewGame);
+                            callback.emit(Msg::NextWord);
                         });
 
                         html! {
