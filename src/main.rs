@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
-use chrono::{Local, NaiveDate};
+use chrono::{Local};
 
 mod components;
 mod state;

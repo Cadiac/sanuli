@@ -226,33 +226,34 @@ impl State {
 
         self.game_manager.borrow_mut().previous_game = previous_game;
 
-        if let Some(game) = self.background_games.remove(&next_game) {
-            // There was a suspended game, restore that suspending previous
-            self.background_games.insert(
-                previous_game,
-                mem::replace(&mut self.game, game),
-            );
-        } else {
-            // There was no suspended game from before - create a new one
-            let suspended_game = mem::replace(
-                &mut self.game,
-                Game::new(
-                    next_game.0,
-                    next_game.1,
-                    next_game.2,
-                    self.game_manager.clone(),
-                ),
-            );
+        // Restore a suspended game or create a new one
+        let mut game = self.background_games.remove(&next_game).unwrap_or(Game::new(
+            next_game.0,
+            next_game.1,
+            next_game.2,
+            self.game_manager.clone(),
+        ));
 
-            self.background_games.insert(
-                (
-                    suspended_game.game_mode,
-                    suspended_game.word_list,
-                    suspended_game.word_length,
-                ),
-                suspended_game,
-            );
+        // For playing the animation populate previous_guesses
+        if previous_game.2 <= next_game.2 {
+            game.previous_guesses = self.game.guesses.clone();
+        } else {
+            game.previous_guesses = self.game.guesses
+                .iter()
+                .cloned()
+                .map(|guess| guess.into_iter().take(game.word_length).collect())
+                .collect();
         }
+
+        if self.game.current_guess < game.max_guesses - 1 {
+            game.previous_guesses.truncate(self.game.current_guess);
+        }
+        game.is_reset = true;
+
+        self.background_games.insert(
+            previous_game,
+            mem::replace(&mut self.game, game),
+        );
 
         true
     }
@@ -787,7 +788,11 @@ impl Game {
 
         if previous_word.len() <= self.word_length {
             self.previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses.truncate(self.current_guess);
+            if self.game_mode == GameMode::Relay && self.is_winner {
+                self.previous_guesses.truncate(self.current_guess);
+            } else {
+                self.previous_guesses.truncate(self.current_guess + 1);
+            }
         } else {
             let previous_guesses = mem::take(&mut self.guesses);
             self.previous_guesses = previous_guesses

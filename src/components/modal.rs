@@ -1,5 +1,5 @@
 use yew::prelude::*;
-use chrono::{Local, NaiveDate};
+use chrono::{Local};
 
 use crate::state::{GameMode, WordList, Theme};
 use crate::Msg;
