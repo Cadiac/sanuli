@@ -1,8 +1,8 @@
+use chrono::Local;
 use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
-use chrono::{Local};
 
 mod components;
 mod state;
@@ -13,11 +13,11 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use state::{GameMode, State, TileState, WordList, Theme};
+use state::{GameMode, State, Theme, TileState, WordList};
 
 const ALLOWED_KEYS: [char; 28] = [
-    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K',
-    'L', 'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
+    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
+    'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
 ];
 
 pub enum Msg {
@@ -33,7 +33,7 @@ pub enum Msg {
     ChangeWordLength(usize),
     ChangeWordList(WordList),
     ChangeAllowProfanities(bool),
-    ChangeTheme(Theme)
+    ChangeTheme(Theme),
 }
 
 pub struct App {
@@ -55,11 +55,10 @@ impl Component for App {
             keyboard_listener: None,
         };
 
-        // if initial_state.state.rehydrate().is_err() {
-        //     // Reinitialize and just continue with defaults
-        //     initial_state.state =
-        //         State::new();
-        // }
+        if initial_state.state.rehydrate().is_err() {
+            // Reinitialize and just continue with defaults
+            initial_state.state = State::new();
+        }
 
         initial_state
     }
@@ -142,35 +141,36 @@ impl Component for App {
                 true
             }
             Msg::ChangeWordLength(new_length) => {
-                self.state.game_manager.borrow_mut().change_word_length(new_length);
-                self.is_menu_visible = false;
-                self.is_help_visible = false;
-                self.state.switch_active_game()
-            }
-            Msg::ChangeGameMode(new_mode) => {
-                self.state.game_manager.borrow_mut().change_game_mode(new_mode);
-                self.is_menu_visible = false;
-                self.is_help_visible = false;
-                self.state.switch_active_game()
-            }
-            Msg::ChangePreviousGameMode => {
-                self.state.game_manager.borrow_mut().change_game_mode(self.state.game_manager.borrow().previous_game.0);
-                self.state.game_manager.borrow_mut().change_word_list(self.state.game_manager.borrow().previous_game.1);
-                self.state.game_manager.borrow_mut().change_word_length(self.state.game_manager.borrow().previous_game.2);
-                self.state.switch_active_game()
-            }
-            Msg::ChangeWordList(list) => {
-                self.state.game_manager.borrow_mut().change_word_list(list);
-                self.is_menu_visible = false;
-                self.is_help_visible = false;
-                self.state.switch_active_game()
-            }
-            Msg::ChangeAllowProfanities(is_allowed) => {
-                self.state.game_manager.borrow_mut().change_allow_profanities(is_allowed);
+                self.state.change_word_length(new_length);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 true
-            },
+            }
+            Msg::ChangeGameMode(new_mode) => {
+                self.state.change_game_mode(new_mode);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
+                true
+            }
+            Msg::ChangeWordList(new_list) => {
+                self.state.change_word_list(new_list);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
+                true
+            }
+            Msg::ChangePreviousGameMode => {
+                self.state.change_previous_game_mode();
+                true
+            }
+            Msg::ChangeAllowProfanities(is_allowed) => {
+                self.state
+                    .game_manager
+                    .borrow_mut()
+                    .change_allow_profanities(is_allowed);
+                self.is_menu_visible = false;
+                self.is_help_visible = false;
+                true
+            }
             Msg::ChangeTheme(theme) => {
                 self.state.game_manager.borrow_mut().change_theme(theme);
                 true
