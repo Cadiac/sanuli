@@ -99,48 +99,58 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
+    let is_daily_word = if let GameMode::DailyWord(_) = props.game_mode { true } else { false };
+
     html! {
         <div class="modal">
             <span onmousedown={toggle_menu} class="modal-close">{"✖"}</span>
-            <div>
-                <label class="label">{"Sanulien pituus:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (props.word_length == 5).then(|| Some("select-active")))}
-                        onmousedown={change_word_length_5}>
-                        {"5 merkkiä"}
-                    </button>
-                    <button class={classes!("select", (props.word_length == 6).then(|| Some("select-active")))}
-                        onmousedown={change_word_length_6}>
-                        {"6 merkkiä"}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="label">{"Sanulista:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_common}>
-                        {"Suppea"}
-                    </button>
-                    <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_full}>
-                        {"Laaja"}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="label">{"Rumat sanulit:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (!props.allow_profanities).then(|| Some("select-active")))}
-                        onmousedown={change_allow_profanities_no}>
-                        {"Ei"}
-                    </button>
-                    <button class={classes!("select", (props.allow_profanities).then(|| Some("select-active")))}
-                        onmousedown={change_allow_profanities_yes}>
-                        {"Kyllä"}
-                    </button>
-                </div>
-            </div>
+            {if !is_daily_word {
+                html! {
+                    <>
+                        <div>
+                            <label class="label">{"Sanulien pituus:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (props.word_length == 5).then(|| Some("select-active")))}
+                                    onmousedown={change_word_length_5}>
+                                    {"5 merkkiä"}
+                                </button>
+                                <button class={classes!("select", (props.word_length == 6).then(|| Some("select-active")))}
+                                    onmousedown={change_word_length_6}>
+                                    {"6 merkkiä"}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label">{"Sanulista:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
+                                    onmousedown={change_word_list_common}>
+                                    {"Suppea"}
+                                </button>
+                                <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
+                                    onmousedown={change_word_list_full}>
+                                    {"Laaja"}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label">{"Rumat sanulit:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (!props.allow_profanities).then(|| Some("select-active")))}
+                                    onmousedown={change_allow_profanities_no}>
+                                    {"Ei"}
+                                </button>
+                                <button class={classes!("select", (props.allow_profanities).then(|| Some("select-active")))}
+                                    onmousedown={change_allow_profanities_yes}>
+                                    {"Kyllä"}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                }
+            } else {
+                html! {}
+            }}
             <div>
                 <label class="label">{"Pelimuoto:"}</label>
                 <div class="select-container">
