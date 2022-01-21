@@ -343,6 +343,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "getrandom",
+ "gloo-storage",
  "rand",
  "serde",
  "serde_json",

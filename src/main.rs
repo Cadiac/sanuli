@@ -48,19 +48,12 @@ impl Component for App {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
-        let mut initial_state = Self {
+        Self {
             state: State::new(),
             is_help_visible: false,
             is_menu_visible: false,
             keyboard_listener: None,
-        };
-
-        if initial_state.state.rehydrate().is_err() {
-            // Reinitialize and just continue with defaults
-            initial_state.state = State::new();
         }
-
-        initial_state
     }
 
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
