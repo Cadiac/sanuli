@@ -1,8 +1,8 @@
+use chrono::NaiveDate;
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
-use chrono::{NaiveDate};
 
-use crate::state::{GameMode, Game, State, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
+use crate::state::{Game, GameMode, State, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
 
 // Migrate the old game data to the new format, removing old data from localStorage.
 // TODO: Get rid of this at some point, even if that means data loss to some players
@@ -25,16 +25,15 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 
                         // AIVAN|2022-01-07|KOIRA,AVAIN,AIVAN,,,|2|true|true
                         // let word = parts[0];
-                        let previous_guesses = parts[2].split(',').map(|guess| {
-                            guess.chars().map(|c| (c, TileState::Unknown)).collect()
-                        });
+                        let previous_guesses = parts[2]
+                            .split(',')
+                            .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
                         let current_guess = parts[3].parse::<usize>().unwrap();
                         let is_guessing = parts[4].parse::<bool>().unwrap();
                         let is_winner = parts[5].parse::<bool>().unwrap();
 
                         // If we haven't got a game in background with this date, create one
-                        let game_id =
-                            (GameMode::DailyWord(date), WordList::Daily, DAILY_WORD_LEN);
+                        let game_id = (GameMode::DailyWord(date), WordList::Daily, DAILY_WORD_LEN);
 
                         if !state.background_games.contains_key(&game_id) {
                             let mut new_daily_game = Game::new(
