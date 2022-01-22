@@ -99,7 +99,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
-    let is_daily_word = if let GameMode::DailyWord(_) = props.game_mode { true } else { false };
+    let is_daily_word = matches!(props.game_mode, GameMode::DailyWord(_));
 
     html! {
         <div class="modal">
@@ -162,7 +162,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", (if let GameMode::DailyWord(_) = props.game_mode { true } else { false }).then(|| Some("select-active")))}
+                    <button class={classes!("select", is_daily_word.then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
                     </button>
