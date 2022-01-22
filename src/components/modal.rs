@@ -1,11 +1,12 @@
 use yew::prelude::*;
+use chrono::{Local};
 
 use crate::state::{GameMode, WordList, Theme};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
-const VERSION: &str = "v1.7";
+const VERSION: &str = "v1.8";
 
 macro_rules! onmousedown {
     ( $cb:ident, $msg:expr ) => {
@@ -86,12 +87,14 @@ pub struct MenuModalProps {
 pub fn menu_modal(props: &MenuModalProps) -> Html {
     let callback = props.callback.clone();
 
+    let today = Local::now().naive_local().date();
+
     let toggle_menu = onmousedown!(callback, Msg::ToggleMenu);
     let change_word_length_5 = onmousedown!(callback, Msg::ChangeWordLength(5));
     let change_word_length_6 = onmousedown!(callback, Msg::ChangeWordLength(6));
     let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
     let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
-    let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord));
+    let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
     let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
     let change_allow_profanities_yes = onmousedown!(callback, Msg::ChangeAllowProfanities(true));
@@ -99,48 +102,58 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
+    let is_daily_word = matches!(props.game_mode, GameMode::DailyWord(_));
+
     html! {
         <div class="modal">
             <span onmousedown={toggle_menu} class="modal-close">{"✖"}</span>
-            <div>
-                <label class="label">{"Sanulien pituus:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (props.word_length == 5).then(|| Some("select-active")))}
-                        onmousedown={change_word_length_5}>
-                        {"5 merkkiä"}
-                    </button>
-                    <button class={classes!("select", (props.word_length == 6).then(|| Some("select-active")))}
-                        onmousedown={change_word_length_6}>
-                        {"6 merkkiä"}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="label">{"Sanulista:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_common}>
-                        {"Suppea"}
-                    </button>
-                    <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
-                        onmousedown={change_word_list_full}>
-                        {"Laaja"}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="label">{"Rumat sanulit:"}</label>
-                <div class="select-container">
-                    <button class={classes!("select", (!props.allow_profanities).then(|| Some("select-active")))}
-                        onmousedown={change_allow_profanities_no}>
-                        {"Ei"}
-                    </button>
-                    <button class={classes!("select", (props.allow_profanities).then(|| Some("select-active")))}
-                        onmousedown={change_allow_profanities_yes}>
-                        {"Kyllä"}
-                    </button>
-                </div>
-            </div>
+            {if !is_daily_word {
+                html! {
+                    <>
+                        <div>
+                            <label class="label">{"Sanulien pituus:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (props.word_length == 5).then(|| Some("select-active")))}
+                                    onmousedown={change_word_length_5}>
+                                    {"5 merkkiä"}
+                                </button>
+                                <button class={classes!("select", (props.word_length == 6).then(|| Some("select-active")))}
+                                    onmousedown={change_word_length_6}>
+                                    {"6 merkkiä"}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label">{"Sanulista:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
+                                    onmousedown={change_word_list_common}>
+                                    {"Suppea"}
+                                </button>
+                                <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
+                                    onmousedown={change_word_list_full}>
+                                    {"Laaja"}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label">{"Rumat sanulit:"}</label>
+                            <div class="select-container">
+                                <button class={classes!("select", (!props.allow_profanities).then(|| Some("select-active")))}
+                                    onmousedown={change_allow_profanities_no}>
+                                    {"Ei"}
+                                </button>
+                                <button class={classes!("select", (props.allow_profanities).then(|| Some("select-active")))}
+                                    onmousedown={change_allow_profanities_yes}>
+                                    {"Kyllä"}
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                }
+            } else {
+                html! {}
+            }}
             <div>
                 <label class="label">{"Pelimuoto:"}</label>
                 <div class="select-container">
@@ -152,7 +165,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", (props.game_mode == GameMode::DailyWord).then(|| Some("select-active")))}
+                    <button class={classes!("select", is_daily_word.then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
                     </button>
