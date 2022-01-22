@@ -6,6 +6,7 @@ use yew::prelude::*;
 
 mod components;
 mod state;
+mod migration;
 
 use components::{
     board::Board,
