@@ -479,14 +479,24 @@ impl State {
 
             if let Some(word_list_str) = local_storage.get_item("word_list")? {
                 if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                    self.game_manager.borrow_mut().current_word_list = word_list;
+                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
+                        // Force the word list as daily word
+                        self.game_manager.borrow_mut().current_word_list = WordList::Daily;
+                    } else {
+                        self.game_manager.borrow_mut().current_word_list = word_list;
+                    }
                 }
                 local_storage.remove_item("word_list")?;
             }
 
             if let Some(word_length_str) = local_storage.get_item("word_length")? {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
-                    self.game_manager.borrow_mut().current_word_length = word_length;
+                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
+                        // Force the word length for daily word
+                        self.game_manager.borrow_mut().current_word_length = DAILY_WORD_LEN;
+                    } else {
+                        self.game_manager.borrow_mut().current_word_length = word_length;
+                    }
                 }
                 local_storage.remove_item("word_length")?;
             }
@@ -1221,7 +1231,12 @@ impl Game {
 
             if let Some(streak_str) = local_storage.get_item("streak")? {
                 if let Ok(streak) = streak_str.parse::<usize>() {
-                    self.streak = streak;
+                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
+                        // Force reset the streak of daily words as the streak was from previous game
+                        self.streak = 0;
+                    } else {
+                        self.streak = streak;
+                    }
                 }
                 local_storage.remove_item("streak")?;
             }
