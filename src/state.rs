@@ -220,67 +220,52 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         // Attempt to rehydrate old game manager from localStorage
-        let mut is_game_manager_hydrated = false;
-        let game_manager = if let Ok(rehydrated) = GameManager::rehydrate() {
-            is_game_manager_hydrated = true;
-            Rc::new(RefCell::new(rehydrated))
-        } else {
-            Rc::new(RefCell::new(GameManager::new()))
-        };
+        if let Ok(rehydrated) = GameManager::rehydrate() {
+            let game_manager = Rc::new(RefCell::new(rehydrated));
 
-        let background_games = HashMap::new();
-
-        let game = Game::new(
-            game_manager.borrow().current_game_mode,
-            game_manager.borrow().current_word_list,
-            game_manager.borrow().current_word_length,
-            game_manager.clone(),
-        );
-
-        let mut initial_state = Self {
-            game_manager,
-            game,
-            background_games,
-        };
-
-        // If rehydrating the old game manager wasn't possible see if its state can be
-        // restored from legacy state in localStorage. This modifies game_manager.
-        // This does nothing if the old localStorage is empty - like it should be after the migration
-        if !is_game_manager_hydrated {
-            // TODO: Remove this at some point, even if it means data loss for some users
-            let _res = initial_state.migrate();
-        }
-        let _res = initial_state.game_manager.borrow().persist();
-
-        // Rehydrating the game requires game_manager to be initialized
-        // Once legacy migration doesn't need to happen anymore these can be simplifiedf
-        let game = if let Ok(old_game) = Game::rehydrate(
-            initial_state.game_manager.borrow().current_game_mode,
-            initial_state.game_manager.borrow().current_word_list,
-            initial_state.game_manager.borrow().current_word_length,
-            initial_state.game_manager.clone(),
-        ) {
-            old_game
-        } else {
-            let mut new_game = Game::new(
-                initial_state.game_manager.borrow().current_game_mode,
-                initial_state.game_manager.borrow().current_word_list,
-                initial_state.game_manager.borrow().current_word_length,
-                initial_state.game_manager.clone(),
+            let game = Game::new_or_rehydrate(
+                game_manager.borrow().current_game_mode,
+                game_manager.borrow().current_word_list,
+                game_manager.borrow().current_word_length,
+                game_manager.clone(),
             );
 
-            // Fallback to see if the game can be restored with a legacy state migration,
-            // if not nothing changes and we still have a new fresh game that can be persisted
-            // TODO: Remove this at some point, even if it means data loss for some users
-            let _res = new_game.migrate();
-            let _res = new_game.persist();
+            return Self {
+                game_manager,
+                game,
+                background_games: HashMap::new(),
+            };
+        } else {
+            // Otherwise either create everything from scratch or recover some data from legacy storage state
+            let game_manager = Rc::new(RefCell::new(GameManager::new()));
+            let background_games = HashMap::new();
+            let game = Game::new(
+                GameMode::Classic,
+                WordList::Common,
+                DEFAULT_WORD_LENGTH,
+                game_manager.clone(),
+            );
 
-            new_game
+            let mut state = Self {
+                game_manager,
+                game,
+                background_games,
+            };
+
+            // Try to migrate old settings and stats from localStorage to current format
+            // TODO: Doesn't do anything if the old state isn't present, but get rid of this at some point
+            let _res = state.migrate();
+            state.switch_active_game();
+
+            // Try to migrate old game streak from localStorage to current format, if the game mode is not daily
+            // TODO: Doesn't do anything if the old state isn't present, but get rid of this at some point
+            let _res = state.game.migrate();
+
+            let _res = state.game_manager.borrow().persist();
+            let _res = state.game.persist();
+
+            return state;
         };
-
-        initial_state.game = game;
-
-        initial_state
     }
 
     pub fn change_word_length(&mut self, new_length: usize) {
@@ -366,6 +351,13 @@ impl State {
             self.game.word_list,
             self.game.word_length,
         );
+
+        if next_game.0 == previous_game.0
+            && next_game.1 == previous_game.1
+            && next_game.2 == previous_game.2
+        {
+            return false;
+        }
 
         self.game_manager.borrow_mut().previous_game = previous_game;
 
@@ -482,7 +474,10 @@ impl State {
 
             if let Some(word_list_str) = local_storage.get_item("word_list")? {
                 if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
+                    if matches!(
+                        self.game_manager.borrow().current_game_mode,
+                        GameMode::DailyWord(_)
+                    ) {
                         // Force the word list as daily word
                         self.game_manager.borrow_mut().current_word_list = WordList::Daily;
                     } else {
@@ -494,7 +489,10 @@ impl State {
 
             if let Some(word_length_str) = local_storage.get_item("word_length")? {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
-                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
+                    if matches!(
+                        self.game_manager.borrow().current_game_mode,
+                        GameMode::DailyWord(_)
+                    ) {
                         // Force the word length for daily word
                         self.game_manager.borrow_mut().current_word_length = DAILY_WORD_LEN;
                     } else {
@@ -510,8 +508,6 @@ impl State {
                 }
                 local_storage.remove_item("allow_profanities")?;
             }
-
-            self.switch_active_game();
 
             if let Some(theme_str) = local_storage.get_item("theme")? {
                 if let Ok(theme) = theme_str.parse::<Theme>() {
@@ -1188,62 +1184,28 @@ impl Game {
         Ok(game)
     }
 
-    // Migrate the old game data to the new format, removing old data from localStorage.
+    // Migrate the old game data (well, only the streak) to the new format, removing old data from localStorage.
     // TODO: Get rid of this at some point, even if that means data loss to some players
     fn migrate(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage()? {
-            if let Some(word) = local_storage.get_item("word")? {
-                self.word = word.chars().collect();
-                local_storage.remove_item("word")?;
-            }
-
-            if let Some(is_guessing_str) = local_storage.get_item("is_guessing")? {
-                if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
-                    self.is_guessing = is_guessing;
-                }
-                local_storage.remove_item("is_guessing")?;
-            }
-
-            if let Some(is_winner_str) = local_storage.get_item("is_winner")? {
-                if let Ok(is_winner) = is_winner_str.parse::<bool>() {
-                    self.is_winner = is_winner;
-                }
-                local_storage.remove_item("is_winner")?;
-            }
-
-            // TODO: Daily word as selected gamemode when migration is made
-            if let Some(guesses_str) = local_storage.get_item("guesses")? {
-                let previous_guesses = guesses_str
-                    .split(',')
-                    .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
-
-                for (guess_index, guess) in previous_guesses.enumerate() {
-                    self.guesses[guess_index] = guess;
-                    self.current_guess = guess_index;
-                    self.calculate_current_guess();
-                }
-                local_storage.remove_item("guesses")?;
-            }
-
-            if let Some(current_guess_str) = local_storage.get_item("current_guess")? {
-                if let Ok(current_guess) = current_guess_str.parse::<usize>() {
-                    self.current_guess = current_guess;
-                }
-                local_storage.remove_item("current_guess")?;
-            }
-
-            if let Some(streak_str) = local_storage.get_item("streak")? {
-                if let Ok(streak) = streak_str.parse::<usize>() {
-                    if matches!(self.game_manager.borrow().current_game_mode, GameMode::DailyWord(_)) {
-                        // Force reset the streak of daily words as the streak was from previous game
-                        self.streak = 0;
-                    } else {
-                        self.streak = streak;
+            match self.game_manager.borrow().current_game_mode {
+                GameMode::Classic | GameMode::Relay => {
+                    if let Some(streak_str) = local_storage.get_item("streak")? {
+                        if let Ok(streak) = streak_str.parse::<usize>() {
+                            self.streak = streak;
+                        }
                     }
                 }
-                local_storage.remove_item("streak")?;
+                _ => {}
             }
+
+            local_storage.remove_item("streak")?;
+            local_storage.remove_item("word")?;
+            local_storage.remove_item("is_guessing")?;
+            local_storage.remove_item("is_winner")?;
+            local_storage.remove_item("guesses")?;
+            local_storage.remove_item("current_guess")?;
         }
 
         Ok(())
