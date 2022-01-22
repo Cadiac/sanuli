@@ -1,6 +1,22 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+
+## v1.8 - 2022-01-22
+
+### Added
+- User can now switch between different game modes and settings without losing the old game state or streaks
+- Lots of internal refactoring to how game state is persisted
+
+### Changed
+- Profanities are now disallowed by default
+- Streaks are now per game mode, and you can no longer cheat and restart the word by changing settings
+    - This unfortunately also means that some users will lose their current streak if daily game mode was the last selected mode. Sorry.
+
+### Fixed
+- Animation when sixth word is correct and new game is started
+
+
 ## v1.7 - 2022-01-16
 
 ### Added
