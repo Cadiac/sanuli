@@ -460,6 +460,9 @@ impl State {
                                     new_daily_game.message = EMPTY.to_string()
                                 }
 
+                                // Persist the game
+                                let _res = new_daily_game.persist();
+
                                 self.background_games.insert(game_id, new_daily_game);
                             } else {
                                 // We... Already had the game? Don't do anything?
@@ -1209,6 +1212,7 @@ impl Game {
                 local_storage.remove_item("is_winner")?;
             }
 
+            // TODO: Daily word as selected gamemode when migration is made
             if let Some(guesses_str) = local_storage.get_item("guesses")? {
                 let previous_guesses = guesses_str
                     .split(',')
