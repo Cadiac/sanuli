@@ -219,26 +219,68 @@ pub struct State {
 
 impl State {
     pub fn new() -> Self {
-        let game_manager = if let Ok(game_manager) = GameManager::rehydrate() {
-            Rc::new(RefCell::new(game_manager))
+        // Attempt to rehydrate old game manager from localStorage
+        let mut is_game_manager_hydrated = false;
+        let game_manager = if let Ok(rehydrated) = GameManager::rehydrate() {
+            is_game_manager_hydrated = true;
+            Rc::new(RefCell::new(rehydrated))
         } else {
             Rc::new(RefCell::new(GameManager::new()))
         };
 
         let background_games = HashMap::new();
 
-        let game = Game::new_or_rehydrate(
+        let game = Game::new(
             game_manager.borrow().current_game_mode,
             game_manager.borrow().current_word_list,
             game_manager.borrow().current_word_length,
             game_manager.clone(),
         );
 
-        Self {
+        let mut initial_state = Self {
             game_manager,
             game,
             background_games,
+        };
+
+        // If rehydrating the old game manager wasn't possible see if its state can be
+        // restored from legacy state in localStorage. This modifies game_manager.
+        // This does nothing if the old localStorage is empty - like it should be after the migration
+        if !is_game_manager_hydrated {
+            // TODO: Remove this at some point, even if it means data loss for some users
+            let _res = initial_state.migrate();
         }
+        let _res = initial_state.game_manager.borrow().persist();
+
+        // Rehydrating the game requires game_manager to be initialized
+        // Once legacy migration doesn't need to happen anymore these can be simplifiedf
+        let game = if let Ok(old_game) = Game::rehydrate(
+            initial_state.game_manager.borrow().current_game_mode,
+            initial_state.game_manager.borrow().current_word_list,
+            initial_state.game_manager.borrow().current_word_length,
+            initial_state.game_manager.clone(),
+        ) {
+            old_game
+        } else {
+            let mut new_game = Game::new(
+                initial_state.game_manager.borrow().current_game_mode,
+                initial_state.game_manager.borrow().current_word_list,
+                initial_state.game_manager.borrow().current_word_length,
+                initial_state.game_manager.clone(),
+            );
+
+            // Fallback to see if the game can be restored with a legacy state migration,
+            // if not nothing changes and we still have a new fresh game that can be persisted
+            // TODO: Remove this at some point, even if it means data loss for some users
+            let _res = new_game.migrate();
+            let _res = new_game.persist();
+
+            new_game
+        };
+
+        initial_state.game = game;
+
+        initial_state
     }
 
     pub fn change_word_length(&mut self, new_length: usize) {
@@ -362,18 +404,23 @@ impl State {
         true
     }
 
+    // Migrate the old game data to the new format, removing old data from localStorage.
+    // TODO: Get rid of this at some point, even if that means data loss to some players
     pub fn migrate(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage().expect("local storage not available") {
             // Daily words
             if let Some(daily_word_history_str) = local_storage.get_item("daily_word_history")? {
+                local_storage.remove_item("daily_word_history")?;
+
                 if daily_word_history_str.len() != 0 {
                     daily_word_history_str.split(',').for_each(|date_str| {
                         let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
-                        let daily_item = local_storage
-                            .get_item(&format!("daily_word_history[{}]", date_str))
-                            .unwrap();
+                        let daily_item_key = &format!("daily_word_history[{}]", date_str);
+                        let daily_item = local_storage.get_item(daily_item_key).unwrap();
                         if let Some(daily_str) = daily_item {
+                            let _res = local_storage.remove_item(daily_item_key);
+
                             let parts = daily_str.split('|').collect::<Vec<&str>>();
 
                             // AIVAN|2022-01-07|KOIRA,AVAIN,AIVAN,,,|2|true|true
@@ -427,24 +474,28 @@ impl State {
                 if let Ok(game_mode) = game_mode_str.parse::<GameMode>() {
                     self.game_manager.borrow_mut().current_game_mode = game_mode;
                 }
+                local_storage.remove_item("game_mode")?;
             }
 
             if let Some(word_list_str) = local_storage.get_item("word_list")? {
                 if let Ok(word_list) = word_list_str.parse::<WordList>() {
                     self.game_manager.borrow_mut().current_word_list = word_list;
                 }
+                local_storage.remove_item("word_list")?;
             }
 
             if let Some(word_length_str) = local_storage.get_item("word_length")? {
                 if let Ok(word_length) = word_length_str.parse::<usize>() {
                     self.game_manager.borrow_mut().current_word_length = word_length;
                 }
+                local_storage.remove_item("word_length")?;
             }
 
             if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
                 if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
                     self.game_manager.borrow_mut().allow_profanities = allow_profanities;
                 }
+                local_storage.remove_item("allow_profanities")?;
             }
 
             self.switch_active_game();
@@ -453,10 +504,12 @@ impl State {
                 if let Ok(theme) = theme_str.parse::<Theme>() {
                     self.game_manager.borrow_mut().theme = theme;
                 }
+                local_storage.remove_item("theme")?;
             }
 
             if let Some(message_str) = local_storage.get_item("message")? {
                 self.game.message = message_str;
+                local_storage.remove_item("message")?;
             }
 
             // Stats
@@ -464,27 +517,21 @@ impl State {
                 if let Ok(max_streak) = max_streak_str.parse::<usize>() {
                     self.game_manager.borrow_mut().max_streak = max_streak;
                 }
+                local_storage.remove_item("max_streak")?;
             }
 
             if let Some(total_played_str) = local_storage.get_item("total_played")? {
                 if let Ok(total_played) = total_played_str.parse::<usize>() {
                     self.game_manager.borrow_mut().total_played = total_played;
                 }
+                local_storage.remove_item("total_played")?;
             }
 
             if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
                 if let Ok(total_solved) = total_solved_str.parse::<usize>() {
                     self.game_manager.borrow_mut().total_solved = total_solved;
                 }
-            }
-
-            // Gamemode specific
-            let current_game_mode = self.game_manager.borrow().current_game_mode.clone();
-            match current_game_mode {
-                GameMode::Classic | GameMode::Relay => {
-                    // self.rehydrate_game()?;
-                }
-                _ => {}
+                local_storage.remove_item("total_solved")?;
             }
         }
 
@@ -611,11 +658,11 @@ impl GameManager {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        LocalStorage::set("game_manager", self)
+        LocalStorage::set("settings", self)
     }
 
     fn rehydrate() -> Result<GameManager, StorageError> {
-        let mut game_manager: GameManager = LocalStorage::get("game_manager")?;
+        let mut game_manager: GameManager = LocalStorage::get("settings")?;
         game_manager.word_lists = parse_all_words();
         Ok(game_manager)
     }
@@ -1128,26 +1175,28 @@ impl Game {
         Ok(game)
     }
 
-    /*
+    // Migrate the old game data to the new format, removing old data from localStorage.
+    // TODO: Get rid of this at some point, even if that means data loss to some players
     fn migrate(&mut self) -> Result<(), JsValue> {
         let window: Window = window().expect("window not available");
         if let Some(local_storage) = window.local_storage()? {
             if let Some(word) = local_storage.get_item("word")? {
-                self.game.word = word.chars().collect();
-            } else {
-                local_storage.set_item("word", &self.game.word.iter().collect::<String>())?;
+                self.word = word.chars().collect();
+                local_storage.remove_item("word")?;
             }
 
             if let Some(is_guessing_str) = local_storage.get_item("is_guessing")? {
                 if let Ok(is_guessing) = is_guessing_str.parse::<bool>() {
-                    self.game.is_guessing = is_guessing;
+                    self.is_guessing = is_guessing;
                 }
+                local_storage.remove_item("is_guessing")?;
             }
 
             if let Some(is_winner_str) = local_storage.get_item("is_winner")? {
                 if let Ok(is_winner) = is_winner_str.parse::<bool>() {
-                    self.game.is_winner = is_winner;
+                    self.is_winner = is_winner;
                 }
+                local_storage.remove_item("is_winner")?;
             }
 
             if let Some(guesses_str) = local_storage.get_item("guesses")? {
@@ -1156,26 +1205,28 @@ impl Game {
                     .map(|guess| guess.chars().map(|c| (c, TileState::Unknown)).collect());
 
                 for (guess_index, guess) in previous_guesses.enumerate() {
-                    self.game.guesses[guess_index] = guess;
-                    self.game.current_guess = guess_index;
-                    self.game.submit_current_guess();
+                    self.guesses[guess_index] = guess;
+                    self.current_guess = guess_index;
+                    self.calculate_current_guess();
                 }
+                local_storage.remove_item("guesses")?;
             }
 
             if let Some(current_guess_str) = local_storage.get_item("current_guess")? {
                 if let Ok(current_guess) = current_guess_str.parse::<usize>() {
-                    self.game.current_guess = current_guess;
+                    self.current_guess = current_guess;
                 }
+                local_storage.remove_item("current_guess")?;
             }
 
             if let Some(streak_str) = local_storage.get_item("streak")? {
                 if let Ok(streak) = streak_str.parse::<usize>() {
-                    self.game.streak = streak;
+                    self.streak = streak;
                 }
+                local_storage.remove_item("streak")?;
             }
         }
 
         Ok(())
     }
-    */
 }
