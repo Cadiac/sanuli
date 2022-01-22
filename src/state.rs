@@ -521,7 +521,6 @@ impl State {
                 local_storage.remove_item("message")?;
             }
 
-            // Stats
             if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
                 if let Ok(max_streak) = max_streak_str.parse::<usize>() {
                     self.game_manager.borrow_mut().max_streak = max_streak;
@@ -575,7 +574,7 @@ impl GameManager {
         let current_word_list = WordList::Common;
         let current_word_length = DEFAULT_WORD_LENGTH;
         let current_max_guesses = DEFAULT_MAX_GUESSES;
-        let allow_profanities = true;
+        let allow_profanities = false;
 
         Self {
             word_lists,
@@ -1178,8 +1177,14 @@ impl Game {
             game.current_guess = guess_index;
             game.calculate_current_guess();
         }
+
         // Restore the current guess
         game.current_guess = current_guess;
+
+        // If the game is ended also recalculate the current guess
+        if !game.is_guessing {
+            game.calculate_current_guess();
+        }
 
         Ok(game)
     }
