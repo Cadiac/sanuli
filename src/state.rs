@@ -26,7 +26,7 @@ pub const DAILY_WORD_LEN: usize = 5;
 type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
 
 fn parse_all_words() -> Rc<WordLists> {
-    let mut word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>> = HashMap::with_capacity(2);
+    let mut word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>> = HashMap::with_capacity(3);
     for word in FULL_WORDS.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
