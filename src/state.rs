@@ -31,7 +31,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Full, word_length))
-            .or_insert(HashSet::new())
+            .or_insert_with(HashSet::new)
             .insert(chars.collect());
     }
 
@@ -40,7 +40,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Common, word_length))
-            .or_insert(HashSet::new())
+            .or_insert_with(HashSet::new)
             .insert(chars.collect());
     }
 
@@ -49,7 +49,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Profanities, word_length))
-            .or_insert(HashSet::new())
+            .or_insert_with(HashSet::new)
             .insert(chars.collect());
     }
 
@@ -151,6 +151,30 @@ pub struct State {
     pub word_lists: Rc<WordLists>,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            allow_profanities: DEFAULT_ALLOW_PROFANITIES,
+            current_game_mode: GameMode::default(),
+            current_word_list: WordList::default(),
+            current_word_length: DEFAULT_WORD_LENGTH,
+            current_max_guesses: DEFAULT_MAX_GUESSES,
+
+            previous_game: (GameMode::default(), WordList::default(), DEFAULT_WORD_LENGTH),
+
+            theme: Theme::default(),
+
+            max_streak: 0,
+            total_played: 0,
+            total_solved: 0,
+
+            game: Game::default(),
+            background_games: HashMap::new(),
+            word_lists: Rc::new(HashMap::new()),
+        }
+    }
+}
+
 impl State {
     pub fn new() -> Self {
         let word_lists = parse_all_words();
@@ -161,48 +185,33 @@ impl State {
                 state.current_game_mode,
                 state.current_word_list,
                 state.current_word_length,
-                word_lists.clone(),
                 state.allow_profanities,
+                word_lists.clone(),
             );
 
             state.game = game;
             state.word_lists = word_lists;
 
-            return state;
+            state
         } else {
             // Otherwise either create everything from scratch or recover some data from legacy storage state
-            let background_games = HashMap::new();
             let game = Game::new(
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
-                word_lists.clone(),
                 DEFAULT_ALLOW_PROFANITIES,
+                word_lists.clone(),
             );
 
             let mut state = Self {
-                allow_profanities: DEFAULT_ALLOW_PROFANITIES,
-                current_word_list: WordList::Common,
-                current_max_guesses: DEFAULT_MAX_GUESSES,
-                current_game_mode: GameMode::Classic,
-                current_word_length: DEFAULT_WORD_LENGTH,
-
-                previous_game: (GameMode::Classic, WordList::Common, DEFAULT_WORD_LENGTH),
-
-                theme: Theme::Dark,
-
-                max_streak: 0,
-                total_played: 0,
-                total_solved: 0,
-
                 game,
-                background_games,
                 word_lists,
+                ..Self::default()
             };
 
             // Try to migrate old settings and stats from localStorage to current format
             // TODO: Doesn't do anything if the old state isn't present, but get rid of this at some point
-            let _res = migration::migrate_state(&mut state);
+            let _res = migration::migrate_settings_and_stats(&mut state);
             state.switch_active_game();
 
             // Try to migrate old game streak from localStorage to current format, if the game mode is not daily
@@ -212,7 +221,7 @@ impl State {
             let _res = state.persist();
             let _res = state.game.persist();
 
-            return state;
+            state
         }
     }
 
@@ -243,14 +252,13 @@ impl State {
         }
 
         if matches!(self.current_game_mode, GameMode::DailyWord(_)) {
-            let previous_game = self.previous_game.clone();
-            self.change_word_list(previous_game.1);
-            self.change_word_length(previous_game.2);
+            self.current_word_list = self.previous_game.1;
+            self.current_word_length = self.previous_game.2;
         }
 
         if matches!(new_mode, GameMode::DailyWord(_)) {
-            self.change_word_list(WordList::Daily);
-            self.change_word_length(DAILY_WORD_LEN);
+            self.current_word_list = WordList::Daily;
+            self.current_word_length = DAILY_WORD_LEN;
         }
 
         self.current_game_mode = new_mode;
@@ -321,16 +329,15 @@ impl State {
         self.previous_game = previous_game;
 
         // Restore a suspended game or create a new one
-        let mut game = self
-            .background_games
-            .remove(&next_game)
-            .unwrap_or(Game::new_or_rehydrate(
+        let mut game = self.background_games.remove(&next_game).unwrap_or_else(|| {
+            Game::new_or_rehydrate(
                 next_game.0,
                 next_game.1,
                 next_game.2,
-                self.word_lists.clone(),
                 self.allow_profanities,
-            ));
+                self.word_lists.clone(),
+            )
+        });
 
         // For playing the animation populate previous_guesses
         if previous_game.2 <= next_game.2 {
@@ -397,8 +404,8 @@ pub struct Game {
     pub is_reset: bool,
     pub message: String,
 
+    #[serde(skip)]
     pub allow_profanities: bool,
-
     #[serde(skip)]
     pub word_lists: Rc<WordLists>,
     #[serde(skip)]
@@ -415,8 +422,8 @@ impl Default for Game {
             GameMode::default(),
             WordList::default(),
             DEFAULT_WORD_LENGTH,
-            Rc::new(HashMap::new()),
             DEFAULT_ALLOW_PROFANITIES,
+            Rc::new(HashMap::new()),
         )
     }
 }
@@ -426,8 +433,8 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        word_lists: Rc<WordLists>,
         allow_profanities: bool,
+        word_lists: Rc<WordLists>,
     ) -> Self {
         let max_guesses = DEFAULT_MAX_GUESSES;
 
@@ -443,13 +450,18 @@ impl Game {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let word = Game::get_word(
-            game_mode,
-            word_list,
-            word_length,
-            word_lists.clone(),
-            allow_profanities,
-        );
+        let word = if word_lists.is_empty() {
+            // Default initialization runs into this
+            vec!['X'; word_length]
+        } else {
+            Game::get_word(
+                game_mode,
+                word_list,
+                word_length,
+                allow_profanities,
+                word_lists.clone(),
+            )
+        };
 
         Self {
             game_mode,
@@ -477,18 +489,24 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        word_lists: Rc<WordLists>,
         allow_profanities: bool,
+        word_lists: Rc<WordLists>,
     ) -> Self {
-        if let Ok(game) = Game::rehydrate(game_mode, word_list, word_length) {
+        if let Ok(game) = Game::rehydrate(
+            game_mode,
+            word_list,
+            word_length,
+            allow_profanities,
+            word_lists.clone(),
+        ) {
             game
         } else {
             Game::new(
                 game_mode,
                 word_list,
                 word_length,
-                word_lists,
                 allow_profanities,
+                word_lists,
             )
         }
     }
@@ -497,21 +515,21 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        word_lists: Rc<WordLists>,
         allow_profanities: bool,
+        word_lists: Rc<WordLists>,
     ) -> Vec<char> {
         if let GameMode::DailyWord(date) = game_mode {
             Game::get_daily_word(date)
         } else {
-            Game::get_random_word(word_list, word_length, word_lists, allow_profanities)
+            Game::get_random_word(word_list, word_length, allow_profanities, word_lists)
         }
     }
 
     fn get_random_word(
         word_list: WordList,
         word_length: usize,
-        word_lists: Rc<WordLists>,
         allow_profanities: bool,
+        word_lists: Rc<WordLists>,
     ) -> Vec<char> {
         let mut words = word_lists
             .get(&(word_list, word_length))
@@ -530,7 +548,7 @@ impl Game {
     }
 
     pub fn get_daily_word_index(date: NaiveDate) -> usize {
-        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
+        let epoch = NaiveDate::from_ymd(2022, 1, 7); // Epoch of the daily word mode, index 0
         date.signed_duration_since(epoch).num_days() as usize
     }
 
@@ -548,8 +566,8 @@ impl Game {
             self.game_mode,
             self.word_list,
             self.word_length,
-            self.word_lists.clone(),
             self.allow_profanities,
+            self.word_lists.clone(),
         );
 
         let previous_word = mem::replace(&mut self.word, next_word);
@@ -689,7 +707,7 @@ impl Game {
                 }
             }
 
-            for (index, (character, tile_state)) in guess.into_iter().enumerate() {
+            for (index, (character, tile_state)) in guess.iter_mut().enumerate() {
                 match self.known_states[row].get(&(*character, index)) {
                     Some(CharacterState::Correct) => {
                         *tile_state = TileState::Correct;
@@ -757,11 +775,10 @@ impl Game {
                                 // the exact count is revealed
                                 *discovered_count = CharacterCount::Exactly(count_in_word);
                             }
-                        } else if count_in_guess == count_in_word {
-                            // The count had the exact count but that isn't revealed yet
-                            *discovered_count = CharacterCount::AtLeast(count_in_guess);
-                        } else if count_in_guess > *count {
-                            // Found more, but the exact count is still unknown
+                        } else if count_in_guess == count_in_word || count_in_guess > *count {
+                            // One of:
+                            // 1) The count had the exact count but that isn't revealed yet
+                            // 2) Found more than before, but the exact count is still unknown
                             *discovered_count = CharacterCount::AtLeast(count_in_guess);
                         }
                     }
@@ -817,7 +834,7 @@ impl Game {
                     .map(|(c, _)| *c)
                     .collect();
 
-                return list.contains(word);
+                list.contains(word)
             }
             None => false,
         }
@@ -879,20 +896,17 @@ impl Game {
 
             if let GameMode::DailyWord(_) = self.game_mode {
                 // Do nothing?
+            } else if self.is_winner {
+                self.streak += 1;
             } else {
-                if self.is_winner {
-                    self.streak += 1;
-                } else {
-                    self.streak = 0;
-                }
+                self.streak = 0;
             }
 
             self.set_game_end_message();
-            let _result = self.persist();
         } else {
             self.current_guess += 1;
-            let _result = self.persist();
         }
+        let _result = self.persist();
     }
 
     pub fn persist(&self) -> Result<(), StorageError> {
@@ -910,6 +924,8 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
+        allow_profanities: bool,
+        word_lists: Rc<WordLists>,
     ) -> Result<Game, StorageError> {
         let game_key = &format!(
             "game|{}|{}|{}",
@@ -919,6 +935,8 @@ impl Game {
         );
 
         let mut game: Game = LocalStorage::get(game_key)?;
+        game.allow_profanities = allow_profanities;
+        game.word_lists = word_lists;
 
         game.known_states = std::iter::repeat(HashMap::new())
             .take(game.max_guesses)

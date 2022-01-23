@@ -1,5 +1,6 @@
-use std::str::FromStr;
+use std::collections::hash_map;
 use std::fmt;
+use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
 use wasm_bindgen::JsValue;
@@ -81,14 +82,14 @@ impl fmt::Display for Theme {
 
 // Migrate the old game data to the new format, removing old data from localStorage.
 // TODO: Get rid of this at some point, even if that means data loss to some players
-pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
+pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
     let window: Window = window().expect("window not available");
     if let Some(local_storage) = window.local_storage().expect("local storage not available") {
         // Daily words
         if let Some(daily_word_history_str) = local_storage.get_item("daily_word_history")? {
             local_storage.remove_item("daily_word_history")?;
 
-            if daily_word_history_str.len() != 0 {
+            if !daily_word_history_str.is_empty() {
                 daily_word_history_str.split(',').for_each(|date_str| {
                     let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap();
                     let daily_item_key = &format!("daily_word_history[{}]", date_str);
@@ -110,13 +111,15 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
                         // If we haven't got a game in background with this date, create one
                         let game_id = (GameMode::DailyWord(date), WordList::Daily, DAILY_WORD_LEN);
 
-                        if !state.background_games.contains_key(&game_id) {
+                        if let hash_map::Entry::Vacant(entry) =
+                            state.background_games.entry(game_id)
+                        {
                             let mut new_daily_game = Game::new(
                                 game_id.0,
                                 game_id.1,
                                 game_id.2,
-                                state.word_lists.clone(),
                                 state.allow_profanities,
+                                state.word_lists.clone(),
                             );
 
                             for (guess_index, guess) in previous_guesses.enumerate() {
@@ -138,7 +141,7 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
                             // Persist the game
                             let _res = new_daily_game.persist();
 
-                            state.background_games.insert(game_id, new_daily_game);
+                            entry.insert(new_daily_game);
                         } else {
                             // We... Already had the game? Don't do anything?
                         }
@@ -157,10 +160,7 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(word_list_str) = local_storage.get_item("word_list")? {
             if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                if matches!(
-                    state.current_game_mode,
-                    GameMode::DailyWord(_)
-                ) {
+                if matches!(state.current_game_mode, GameMode::DailyWord(_)) {
                     // Force the word list as daily word
                     state.current_word_list = WordList::Daily;
                 } else {
@@ -172,10 +172,7 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(word_length_str) = local_storage.get_item("word_length")? {
             if let Ok(word_length) = word_length_str.parse::<usize>() {
-                if matches!(
-                    state.current_game_mode,
-                    GameMode::DailyWord(_)
-                ) {
+                if matches!(state.current_game_mode, GameMode::DailyWord(_)) {
                     // Force the word length for daily word
                     state.current_word_length = DAILY_WORD_LEN;
                 } else {
