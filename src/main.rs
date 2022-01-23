@@ -5,8 +5,8 @@ use web_sys::{window, Window};
 use yew::prelude::*;
 
 mod components;
-mod state;
 mod migration;
+mod state;
 
 use components::{
     board::Board,
@@ -14,7 +14,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use state::{GameMode, State, Theme, TileState, WordList};
+use state::{Game, GameMode, State, Theme, TileState, WordList};
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -122,7 +122,7 @@ impl Component for App {
 
                 true
             }
-            Msg::Guess => self.state.game.submit_guess(),
+            Msg::Guess => self.state.submit_guess(),
             Msg::NextWord => self.state.game.next_word(),
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
@@ -157,16 +157,13 @@ impl Component for App {
                 true
             }
             Msg::ChangeAllowProfanities(is_allowed) => {
-                self.state
-                    .game_manager
-                    .borrow_mut()
-                    .change_allow_profanities(is_allowed);
+                self.state.change_allow_profanities(is_allowed);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
                 true
             }
             Msg::ChangeTheme(theme) => {
-                self.state.game_manager.borrow_mut().change_theme(theme);
+                self.state.change_theme(theme);
                 true
             }
         }
@@ -187,17 +184,16 @@ impl Component for App {
             .map(|(c, _)| c)
             .collect::<String>();
 
-        let game_manager = self.state.game_manager.borrow();
         let today = Local::now().naive_local().date();
 
         html! {
-            <div class={classes!("game", game_manager.theme.to_string())}>
+            <div class={classes!("game", self.state.theme.to_string())}>
                 <Header
                     on_toggle_help_cb={link.callback(|_| Msg::ToggleHelp)}
                     on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
                     streak={self.state.game.streak}
                     game_mode={self.state.game.game_mode}
-                    daily_word_number={game_manager.get_daily_word_index(today) + 1}
+                    daily_word_number={Game::get_daily_word_index(today) + 1}
                 />
 
                 <Board
@@ -235,14 +231,14 @@ impl Component for App {
                         html! {
                             <MenuModal
                                 callback={link.callback(move |msg| msg)}
-                                game_mode={game_manager.current_game_mode}
-                                word_length={game_manager.current_word_length}
-                                current_word_list={game_manager.current_word_list}
-                                allow_profanities={game_manager.allow_profanities}
-                                theme={game_manager.theme}
-                                max_streak={game_manager.max_streak}
-                                total_played={game_manager.total_played}
-                                total_solved={game_manager.total_solved}
+                                game_mode={self.state.current_game_mode}
+                                word_length={self.state.current_word_length}
+                                current_word_list={self.state.current_word_list}
+                                allow_profanities={self.state.allow_profanities}
+                                theme={self.state.theme}
+                                max_streak={self.state.max_streak}
+                                total_played={self.state.total_played}
+                                total_solved={self.state.total_solved}
                             />
                         }
                     } else {

@@ -1,13 +1,11 @@
 use rand::seq::SliceRandom;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::mem;
 use std::rc::Rc;
-use std::str::FromStr;
 
-use chrono::{Local, NaiveDate};
+use chrono::NaiveDate;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +19,7 @@ const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺
 pub const EMPTY: char = '\u{00a0}'; // &nbsp;
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
+pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 pub const DAILY_WORD_LEN: usize = 5;
 
 type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
@@ -71,31 +70,6 @@ impl Default for WordList {
     }
 }
 
-impl FromStr for WordList {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<WordList, Self::Err> {
-        match input {
-            "full" => Ok(WordList::Full),
-            "common" => Ok(WordList::Common),
-            "profanities" => Ok(WordList::Profanities),
-            "daily" => Ok(WordList::Daily),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for WordList {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            WordList::Full => write!(f, "full"),
-            WordList::Common => write!(f, "common"),
-            WordList::Profanities => write!(f, "profanities"),
-            WordList::Daily => write!(f, "daily"),
-        }
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum GameMode {
     Classic,
@@ -109,32 +83,6 @@ impl Default for GameMode {
     }
 }
 
-impl FromStr for GameMode {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<GameMode, Self::Err> {
-        match input {
-            "classic" => Ok(GameMode::Classic),
-            "relay" => Ok(GameMode::Relay),
-            "daily_word" => {
-                let today = Local::now().naive_local().date();
-                Ok(GameMode::DailyWord(today))
-            }
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for GameMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GameMode::Classic => write!(f, "classic"),
-            GameMode::Relay => write!(f, "relay"),
-            GameMode::DailyWord(_) => write!(f, "daily_word"),
-        }
-    }
-}
-
 #[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum Theme {
     Dark,
@@ -144,27 +92,6 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme::Dark
-    }
-}
-
-impl FromStr for Theme {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<Theme, Self::Err> {
-        match input {
-            "dark" => Ok(Theme::Dark),
-            "colorblind" => Ok(Theme::Colorblind),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for Theme {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Theme::Dark => write!(f, "dark"),
-            Theme::Colorblind => write!(f, "colorblind"),
-        }
     }
 }
 
@@ -194,62 +121,83 @@ impl fmt::Display for TileState {
     }
 }
 
-#[derive(Clone, PartialEq)]
-pub struct DailyWordHistory {
-    date: NaiveDate,
-    word: String,
-    guesses: Vec<Vec<char>>,
-    current_guess: usize,
-    is_guessing: bool,
-    is_winner: bool,
-}
-
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum CharacterCount {
     AtLeast(usize),
     Exactly(usize),
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct State {
-    pub game_manager: Rc<RefCell<GameManager>>,
+    pub allow_profanities: bool,
+    pub current_game_mode: GameMode,
+    pub current_word_list: WordList,
+    pub current_word_length: usize,
+    pub current_max_guesses: usize,
+
+    pub previous_game: (GameMode, WordList, usize),
+
+    pub theme: Theme,
+
+    pub max_streak: usize,
+    pub total_played: usize,
+    pub total_solved: usize,
+
+    #[serde(skip)]
     pub game: Game,
+    #[serde(skip)]
     pub background_games: HashMap<(GameMode, WordList, usize), Game>,
+    #[serde(skip)]
+    pub word_lists: Rc<WordLists>,
 }
 
 impl State {
     pub fn new() -> Self {
-        // Attempt to rehydrate old game manager from localStorage
-        if let Ok(rehydrated) = GameManager::rehydrate() {
-            let game_manager = Rc::new(RefCell::new(rehydrated));
+        let word_lists = parse_all_words();
 
+        // Attempt to rehydrate state from localStorage
+        if let Ok(mut state) = State::rehydrate() {
             let game = Game::new_or_rehydrate(
-                game_manager.borrow().current_game_mode,
-                game_manager.borrow().current_word_list,
-                game_manager.borrow().current_word_length,
-                game_manager.clone(),
+                state.current_game_mode,
+                state.current_word_list,
+                state.current_word_length,
+                word_lists.clone(),
+                state.allow_profanities,
             );
 
-            return Self {
-                game_manager,
-                game,
-                background_games: HashMap::new(),
-            };
+            state.game = game;
+            state.word_lists = word_lists;
+
+            return state;
         } else {
             // Otherwise either create everything from scratch or recover some data from legacy storage state
-            let game_manager = Rc::new(RefCell::new(GameManager::new()));
             let background_games = HashMap::new();
             let game = Game::new(
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
-                game_manager.clone(),
+                word_lists.clone(),
+                DEFAULT_ALLOW_PROFANITIES,
             );
 
             let mut state = Self {
-                game_manager,
+                allow_profanities: DEFAULT_ALLOW_PROFANITIES,
+                current_word_list: WordList::Common,
+                current_max_guesses: DEFAULT_MAX_GUESSES,
+                current_game_mode: GameMode::Classic,
+                current_word_length: DEFAULT_WORD_LENGTH,
+
+                previous_game: (GameMode::Classic, WordList::Common, DEFAULT_WORD_LENGTH),
+
+                theme: Theme::Dark,
+
+                max_streak: 0,
+                total_played: 0,
+                total_solved: 0,
+
                 game,
                 background_games,
+                word_lists,
             };
 
             // Try to migrate old settings and stats from localStorage to current format
@@ -261,89 +209,100 @@ impl State {
             // TODO: Doesn't do anything if the old state isn't present, but get rid of this at some point
             let _res = migration::migrate_game(&mut state.game);
 
-            let _res = state.game_manager.borrow().persist();
+            let _res = state.persist();
             let _res = state.game.persist();
 
             return state;
-        };
+        }
+    }
+
+    pub fn submit_guess(&mut self) -> bool {
+        self.game.submit_guess();
+        if !self.game.is_guessing {
+            self.update_game_statistics(self.game.is_winner, self.game.streak);
+        }
+
+        true
     }
 
     pub fn change_word_length(&mut self, new_length: usize) {
-        if self.game_manager.borrow().current_word_length == new_length {
+        if self.current_word_length == new_length {
             return;
         }
 
-        self.game_manager
-            .borrow_mut()
-            .change_word_length(new_length);
+        self.current_word_length = new_length;
         self.switch_active_game();
-        let _res = self.game_manager.borrow_mut().persist();
+
+        let _res = self.persist();
         let _res = self.game.persist();
     }
 
     pub fn change_game_mode(&mut self, new_mode: GameMode) {
-        if self.game_manager.borrow().current_game_mode == new_mode {
+        if self.current_game_mode == new_mode {
             return;
         }
 
-        if matches!(
-            self.game_manager.borrow().current_game_mode,
-            GameMode::DailyWord(_)
-        ) {
-            let previous_game = self.game_manager.borrow().previous_game.clone();
-            self.game_manager
-                .borrow_mut()
-                .change_word_list(previous_game.1);
-            self.game_manager
-                .borrow_mut()
-                .change_word_length(previous_game.2);
+        if matches!(self.current_game_mode, GameMode::DailyWord(_)) {
+            let previous_game = self.previous_game.clone();
+            self.change_word_list(previous_game.1);
+            self.change_word_length(previous_game.2);
         }
 
         if matches!(new_mode, GameMode::DailyWord(_)) {
-            self.game_manager
-                .borrow_mut()
-                .change_word_list(WordList::Daily);
-            self.game_manager
-                .borrow_mut()
-                .change_word_length(DAILY_WORD_LEN);
+            self.change_word_list(WordList::Daily);
+            self.change_word_length(DAILY_WORD_LEN);
         }
 
-        self.game_manager.borrow_mut().change_game_mode(new_mode);
+        self.current_game_mode = new_mode;
         self.switch_active_game();
-        let _res = self.game_manager.borrow_mut().persist();
+        let _res = self.persist();
         let _res = self.game.persist();
     }
 
     pub fn change_word_list(&mut self, new_list: WordList) {
-        if self.game_manager.borrow().current_word_list == new_list {
+        if self.current_word_list == new_list {
             return;
         }
 
-        self.game_manager.borrow_mut().change_word_list(new_list);
+        self.current_word_list = new_list;
         self.switch_active_game();
-        let _res = self.game_manager.borrow_mut().persist();
+
+        let _res = self.persist();
         let _res = self.game.persist();
     }
 
     pub fn change_previous_game_mode(&mut self) {
-        let (game_mode, word_list, word_length) = self.game_manager.borrow().previous_game;
+        let (game_mode, word_list, word_length) = self.previous_game;
 
-        self.game_manager.borrow_mut().change_game_mode(game_mode);
-        self.game_manager.borrow_mut().change_word_list(word_list);
-        self.game_manager
-            .borrow_mut()
-            .change_word_length(word_length);
+        self.current_game_mode = game_mode;
+        self.current_word_list = word_list;
+        self.current_word_length = word_length;
         self.switch_active_game();
 
-        let _res = self.game_manager.borrow_mut().persist();
+        let _res = self.persist();
         let _res = self.game.persist();
     }
 
-    pub fn switch_active_game(&mut self) -> bool {
+    pub fn change_allow_profanities(&mut self, is_allowed: bool) {
+        self.allow_profanities = is_allowed;
+        self.game.allow_profanities = self.allow_profanities;
+        self.background_games.values_mut().for_each(|game| {
+            game.allow_profanities = self.allow_profanities;
+        });
+        let _result = self.persist();
+    }
+
+    pub fn change_theme(&mut self, theme: Theme) -> bool {
+        self.theme = theme;
+        let _result = self.persist();
+        true
+    }
+
+    fn switch_active_game(&mut self) -> bool {
         let next_game = (
-            self.game_manager.borrow().current_game_mode,
-            self.game_manager.borrow().current_word_list,
-            self.game_manager.borrow().current_word_length,
+            self.current_game_mode,
+            self.current_word_list,
+            self.current_word_length,
         );
 
         let previous_game = (
@@ -359,7 +318,7 @@ impl State {
             return false;
         }
 
-        self.game_manager.borrow_mut().previous_game = previous_game;
+        self.previous_game = previous_game;
 
         // Restore a suspended game or create a new one
         let mut game = self
@@ -369,7 +328,8 @@ impl State {
                 next_game.0,
                 next_game.1,
                 next_game.2,
-                self.game_manager.clone(),
+                self.word_lists.clone(),
+                self.allow_profanities,
             ));
 
         // For playing the animation populate previous_guesses
@@ -395,90 +355,6 @@ impl State {
 
         true
     }
-}
-
-#[derive(Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct GameManager {
-    #[serde(skip)]
-    pub word_lists: Rc<WordLists>,
-
-    pub allow_profanities: bool,
-    pub current_game_mode: GameMode,
-    pub current_word_list: WordList,
-    pub current_word_length: usize,
-
-    pub previous_game: (GameMode, WordList, usize),
-
-    pub current_max_guesses: usize,
-
-    pub theme: Theme,
-
-    pub max_streak: usize,
-    pub total_played: usize,
-    pub total_solved: usize,
-}
-
-impl GameManager {
-    pub fn new() -> Self {
-        let word_lists = parse_all_words();
-        let current_word_list = WordList::Common;
-        let current_word_length = DEFAULT_WORD_LENGTH;
-        let current_max_guesses = DEFAULT_MAX_GUESSES;
-        let allow_profanities = false;
-
-        Self {
-            word_lists,
-            current_word_list,
-            allow_profanities,
-
-            current_max_guesses,
-
-            current_game_mode: GameMode::Classic,
-            previous_game: (GameMode::Classic, WordList::Common, DEFAULT_WORD_LENGTH),
-            current_word_length,
-
-            theme: Theme::Dark,
-
-            max_streak: 0,
-            total_played: 0,
-            total_solved: 0,
-        }
-    }
-
-    pub fn get_random_word(&self, word_list: WordList, word_length: usize) -> Vec<char> {
-        let mut words = self
-            .word_lists
-            .get(&(word_list, word_length))
-            .unwrap()
-            .iter()
-            .collect::<Vec<_>>();
-
-        if !self.allow_profanities {
-            if let Some(profanities) = self
-                .word_lists
-                .get(&(WordList::Profanities, self.current_word_length))
-            {
-                words.retain(|word| !profanities.contains(*word));
-            }
-        }
-
-        let chosen = words.choose(&mut rand::thread_rng()).unwrap();
-        (*chosen).clone()
-    }
-
-    pub fn get_daily_word_index(&self, date: NaiveDate) -> usize {
-        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
-        date.signed_duration_since(epoch).num_days() as usize
-    }
-
-    pub fn get_daily_word(&self, date: NaiveDate) -> Vec<char> {
-        DAILY_WORDS
-            .lines()
-            .nth(self.get_daily_word_index(date))
-            .unwrap()
-            .chars()
-            .collect()
-    }
 
     fn update_game_statistics(&mut self, is_winner: bool, streak: usize) {
         self.total_played += 1;
@@ -492,37 +368,14 @@ impl GameManager {
         }
     }
 
-    fn change_word_length(&mut self, new_length: usize) {
-        self.current_word_length = new_length;
-    }
-
-    fn change_game_mode(&mut self, new_mode: GameMode) {
-        self.current_game_mode = new_mode;
-    }
-
-    fn change_word_list(&mut self, new_list: WordList) {
-        self.current_word_list = new_list;
-    }
-
-    pub fn change_allow_profanities(&mut self, is_allowed: bool) {
-        self.allow_profanities = is_allowed;
-        let _result = self.persist();
-    }
-
-    pub fn change_theme(&mut self, theme: Theme) -> bool {
-        self.theme = theme;
-        let _result = self.persist();
-        true
-    }
-
     fn persist(&self) -> Result<(), StorageError> {
         LocalStorage::set("settings", self)
     }
 
-    fn rehydrate() -> Result<GameManager, StorageError> {
-        let mut game_manager: GameManager = LocalStorage::get("settings")?;
-        game_manager.word_lists = parse_all_words();
-        Ok(game_manager)
+    fn rehydrate() -> Result<Self, StorageError> {
+        let mut state: Self = LocalStorage::get("settings")?;
+        state.word_lists = parse_all_words();
+        Ok(state)
     }
 }
 
@@ -544,8 +397,10 @@ pub struct Game {
     pub is_reset: bool,
     pub message: String,
 
+    pub allow_profanities: bool,
+
     #[serde(skip)]
-    pub game_manager: Rc<RefCell<GameManager>>,
+    pub word_lists: Rc<WordLists>,
     #[serde(skip)]
     pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
     #[serde(skip)]
@@ -554,12 +409,25 @@ pub struct Game {
     pub previous_guesses: Vec<Vec<(char, TileState)>>,
 }
 
+impl Default for Game {
+    fn default() -> Self {
+        Game::new(
+            GameMode::default(),
+            WordList::default(),
+            DEFAULT_WORD_LENGTH,
+            Rc::new(HashMap::new()),
+            DEFAULT_ALLOW_PROFANITIES,
+        )
+    }
+}
+
 impl Game {
     pub fn new(
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        game_manager: Rc<RefCell<GameManager>>,
+        word_lists: Rc<WordLists>,
+        allow_profanities: bool,
     ) -> Self {
         let max_guesses = DEFAULT_MAX_GUESSES;
 
@@ -575,20 +443,22 @@ impl Game {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let word = if let GameMode::DailyWord(date) = game_mode {
-            game_manager.borrow().get_daily_word(date)
-        } else {
-            game_manager
-                .borrow()
-                .get_random_word(word_list, word_length)
-        };
+        let word = Game::get_word(
+            game_mode,
+            word_list,
+            word_length,
+            word_lists.clone(),
+            allow_profanities,
+        );
 
         Self {
             game_mode,
             word_list,
+            word_lists,
             word_length,
             max_guesses,
             word,
+            allow_profanities,
             is_guessing: true,
             is_winner: false,
             is_unknown: false,
@@ -599,36 +469,88 @@ impl Game {
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
-
-            game_manager,
-
             streak: 0,
         }
     }
 
-    pub fn new_or_rehydrate(
+    fn new_or_rehydrate(
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        game_manager: Rc<RefCell<GameManager>>,
+        word_lists: Rc<WordLists>,
+        allow_profanities: bool,
     ) -> Self {
-        if let Ok(game) = Game::rehydrate(game_mode, word_list, word_length, game_manager.clone()) {
+        if let Ok(game) = Game::rehydrate(game_mode, word_list, word_length) {
             game
         } else {
-            Game::new(game_mode, word_list, word_length, game_manager.clone())
+            Game::new(
+                game_mode,
+                word_list,
+                word_length,
+                word_lists,
+                allow_profanities,
+            )
         }
     }
 
+    fn get_word(
+        game_mode: GameMode,
+        word_list: WordList,
+        word_length: usize,
+        word_lists: Rc<WordLists>,
+        allow_profanities: bool,
+    ) -> Vec<char> {
+        if let GameMode::DailyWord(date) = game_mode {
+            Game::get_daily_word(date)
+        } else {
+            Game::get_random_word(word_list, word_length, word_lists, allow_profanities)
+        }
+    }
+
+    fn get_random_word(
+        word_list: WordList,
+        word_length: usize,
+        word_lists: Rc<WordLists>,
+        allow_profanities: bool,
+    ) -> Vec<char> {
+        let mut words = word_lists
+            .get(&(word_list, word_length))
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+
+        if !allow_profanities {
+            if let Some(profanities) = word_lists.get(&(WordList::Profanities, word_length)) {
+                words.retain(|word| !profanities.contains(*word));
+            }
+        }
+
+        let chosen = words.choose(&mut rand::thread_rng()).unwrap();
+        (*chosen).clone()
+    }
+
+    pub fn get_daily_word_index(date: NaiveDate) -> usize {
+        let epoch = NaiveDate::from_ymd(2022, 1, 07); // Epoch of the daily word mode, index 0
+        date.signed_duration_since(epoch).num_days() as usize
+    }
+
+    fn get_daily_word(date: NaiveDate) -> Vec<char> {
+        DAILY_WORDS
+            .lines()
+            .nth(Game::get_daily_word_index(date))
+            .unwrap()
+            .chars()
+            .collect()
+    }
+
     pub fn next_word(&mut self) -> bool {
-        let next_word =
-            if let GameMode::DailyWord(date) = self.game_manager.borrow().current_game_mode {
-                self.game_manager.borrow().get_daily_word(date)
-            } else {
-                self.game_manager.borrow().get_random_word(
-                    self.game_manager.borrow().current_word_list,
-                    self.game_manager.borrow().current_word_length,
-                )
-            };
+        let next_word = Game::get_word(
+            self.game_mode,
+            self.word_list,
+            self.word_length,
+            self.word_lists.clone(),
+            self.allow_profanities,
+        );
 
         let previous_word = mem::replace(&mut self.word, next_word);
 
@@ -888,12 +810,7 @@ impl Game {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self
-            .game_manager
-            .borrow()
-            .word_lists
-            .get(&(WordList::Full, self.word_length))
-        {
+        match self.word_lists.get(&(WordList::Full, self.word_length)) {
             Some(list) => {
                 let word: &Vec<char> = &self.guesses[self.current_guess]
                     .iter()
@@ -941,15 +858,15 @@ impl Game {
         }
     }
 
-    pub fn submit_guess(&mut self) -> bool {
+    fn submit_guess(&mut self) {
         if !self.is_guess_allowed() {
             self.message = "Liian vähän kirjaimia!".to_owned();
-            return true;
+            return;
         }
         if !self.is_guess_real_word() {
             self.is_unknown = true;
             self.message = "Ei sanulistalla.".to_owned();
-            return true;
+            return;
         }
 
         self.is_reset = false;
@@ -968,22 +885,14 @@ impl Game {
                 } else {
                     self.streak = 0;
                 }
-
-                self.game_manager
-                    .borrow_mut()
-                    .update_game_statistics(self.is_winner, self.streak);
             }
 
             self.set_game_end_message();
-
-            let _result = self.game_manager.borrow().persist();
+            let _result = self.persist();
         } else {
             self.current_guess += 1;
+            let _result = self.persist();
         }
-
-        let _result = self.persist();
-
-        true
     }
 
     pub fn persist(&self) -> Result<(), StorageError> {
@@ -1001,7 +910,6 @@ impl Game {
         game_mode: GameMode,
         word_list: WordList,
         word_length: usize,
-        game_manager: Rc<RefCell<GameManager>>,
     ) -> Result<Game, StorageError> {
         let game_key = &format!(
             "game|{}|{}|{}",
@@ -1011,7 +919,6 @@ impl Game {
         );
 
         let mut game: Game = LocalStorage::get(game_key)?;
-        game.game_manager = game_manager;
 
         game.known_states = std::iter::repeat(HashMap::new())
             .take(game.max_guesses)

@@ -1,8 +1,83 @@
-use chrono::NaiveDate;
+use std::str::FromStr;
+use std::fmt;
+
+use chrono::{Local, NaiveDate};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
 use crate::state::{Game, GameMode, State, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
+
+impl FromStr for GameMode {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<GameMode, Self::Err> {
+        match input {
+            "classic" => Ok(GameMode::Classic),
+            "relay" => Ok(GameMode::Relay),
+            "daily_word" => {
+                let today = Local::now().naive_local().date();
+                Ok(GameMode::DailyWord(today))
+            }
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for GameMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GameMode::Classic => write!(f, "classic"),
+            GameMode::Relay => write!(f, "relay"),
+            GameMode::DailyWord(_) => write!(f, "daily_word"),
+        }
+    }
+}
+
+impl FromStr for WordList {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<WordList, Self::Err> {
+        match input {
+            "full" => Ok(WordList::Full),
+            "common" => Ok(WordList::Common),
+            "profanities" => Ok(WordList::Profanities),
+            "daily" => Ok(WordList::Daily),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for WordList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WordList::Full => write!(f, "full"),
+            WordList::Common => write!(f, "common"),
+            WordList::Profanities => write!(f, "profanities"),
+            WordList::Daily => write!(f, "daily"),
+        }
+    }
+}
+
+impl FromStr for Theme {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Theme, Self::Err> {
+        match input {
+            "dark" => Ok(Theme::Dark),
+            "colorblind" => Ok(Theme::Colorblind),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for Theme {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Theme::Dark => write!(f, "dark"),
+            Theme::Colorblind => write!(f, "colorblind"),
+        }
+    }
+}
 
 // Migrate the old game data to the new format, removing old data from localStorage.
 // TODO: Get rid of this at some point, even if that means data loss to some players
@@ -40,7 +115,8 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
                                 game_id.0,
                                 game_id.1,
                                 game_id.2,
-                                state.game_manager.clone(),
+                                state.word_lists.clone(),
+                                state.allow_profanities,
                             );
 
                             for (guess_index, guess) in previous_guesses.enumerate() {
@@ -74,7 +150,7 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
         // Current game
         if let Some(game_mode_str) = local_storage.get_item("game_mode")? {
             if let Ok(game_mode) = game_mode_str.parse::<GameMode>() {
-                state.game_manager.borrow_mut().current_game_mode = game_mode;
+                state.current_game_mode = game_mode;
             }
             local_storage.remove_item("game_mode")?;
         }
@@ -82,13 +158,13 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
         if let Some(word_list_str) = local_storage.get_item("word_list")? {
             if let Ok(word_list) = word_list_str.parse::<WordList>() {
                 if matches!(
-                    state.game_manager.borrow().current_game_mode,
+                    state.current_game_mode,
                     GameMode::DailyWord(_)
                 ) {
                     // Force the word list as daily word
-                    state.game_manager.borrow_mut().current_word_list = WordList::Daily;
+                    state.current_word_list = WordList::Daily;
                 } else {
-                    state.game_manager.borrow_mut().current_word_list = word_list;
+                    state.current_word_list = word_list;
                 }
             }
             local_storage.remove_item("word_list")?;
@@ -97,13 +173,13 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
         if let Some(word_length_str) = local_storage.get_item("word_length")? {
             if let Ok(word_length) = word_length_str.parse::<usize>() {
                 if matches!(
-                    state.game_manager.borrow().current_game_mode,
+                    state.current_game_mode,
                     GameMode::DailyWord(_)
                 ) {
                     // Force the word length for daily word
-                    state.game_manager.borrow_mut().current_word_length = DAILY_WORD_LEN;
+                    state.current_word_length = DAILY_WORD_LEN;
                 } else {
-                    state.game_manager.borrow_mut().current_word_length = word_length;
+                    state.current_word_length = word_length;
                 }
             }
             local_storage.remove_item("word_length")?;
@@ -111,14 +187,14 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
             if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
-                state.game_manager.borrow_mut().allow_profanities = allow_profanities;
+                state.allow_profanities = allow_profanities;
             }
             local_storage.remove_item("allow_profanities")?;
         }
 
         if let Some(theme_str) = local_storage.get_item("theme")? {
             if let Ok(theme) = theme_str.parse::<Theme>() {
-                state.game_manager.borrow_mut().theme = theme;
+                state.theme = theme;
             }
             local_storage.remove_item("theme")?;
         }
@@ -130,21 +206,21 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
             if let Ok(max_streak) = max_streak_str.parse::<usize>() {
-                state.game_manager.borrow_mut().max_streak = max_streak;
+                state.max_streak = max_streak;
             }
             local_storage.remove_item("max_streak")?;
         }
 
         if let Some(total_played_str) = local_storage.get_item("total_played")? {
             if let Ok(total_played) = total_played_str.parse::<usize>() {
-                state.game_manager.borrow_mut().total_played = total_played;
+                state.total_played = total_played;
             }
             local_storage.remove_item("total_played")?;
         }
 
         if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
             if let Ok(total_solved) = total_solved_str.parse::<usize>() {
-                state.game_manager.borrow_mut().total_solved = total_solved;
+                state.total_solved = total_solved;
             }
             local_storage.remove_item("total_solved")?;
         }
@@ -158,7 +234,7 @@ pub fn migrate_state(state: &mut State) -> Result<(), JsValue> {
 pub fn migrate_game(game: &mut Game) -> Result<(), JsValue> {
     let window: Window = window().expect("window not available");
     if let Some(local_storage) = window.local_storage()? {
-        match game.game_manager.borrow().current_game_mode {
+        match game.game_mode {
             GameMode::Classic | GameMode::Relay => {
                 if let Some(streak_str) = local_storage.get_item("streak")? {
                     if let Ok(streak) = streak_str.parse::<usize>() {
