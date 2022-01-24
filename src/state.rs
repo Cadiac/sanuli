@@ -5,7 +5,7 @@ use std::fmt;
 use std::mem;
 use std::rc::Rc;
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Local};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
@@ -181,6 +181,15 @@ impl State {
 
         // Attempt to rehydrate state from localStorage
         if let Ok(mut state) = State::rehydrate() {
+            if let GameMode::DailyWord(date) = state.current_game_mode {
+                let today = Local::today().naive_local();
+
+                if date < today {
+                    // Page was refreshed after the day changed - rehydrate the daily word of today
+                    state.current_game_mode = GameMode::DailyWord(today);
+                }
+            }
+
             let game = Game::new_or_rehydrate(
                 state.current_game_mode,
                 state.current_word_list,
@@ -459,7 +468,7 @@ impl Game {
                 word_list,
                 word_length,
                 allow_profanities,
-                word_lists.clone(),
+                &word_lists,
             )
         };
 
@@ -516,7 +525,7 @@ impl Game {
         word_list: WordList,
         word_length: usize,
         allow_profanities: bool,
-        word_lists: Rc<WordLists>,
+        word_lists: &Rc<WordLists>,
     ) -> Vec<char> {
         if let GameMode::DailyWord(date) = game_mode {
             Game::get_daily_word(date)
@@ -529,7 +538,7 @@ impl Game {
         word_list: WordList,
         word_length: usize,
         allow_profanities: bool,
-        word_lists: Rc<WordLists>,
+        word_lists: &Rc<WordLists>,
     ) -> Vec<char> {
         let mut words = word_lists
             .get(&(word_list, word_length))
@@ -567,7 +576,7 @@ impl Game {
             self.word_list,
             self.word_length,
             self.allow_profanities,
-            self.word_lists.clone(),
+            &self.word_lists,
         );
 
         let previous_word = mem::replace(&mut self.word, next_word);
