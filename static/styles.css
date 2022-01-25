@@ -196,6 +196,8 @@ header {
     width: 100%;
     justify-content: center;
     margin-bottom: 6px;
+    user-select: none;
+    -webkit-user-select: none; /* Prevent selection on iOS */
 }
 
 .keyboard-second {
@@ -221,6 +223,7 @@ header {
     touch-action: none;
     cursor: pointer;
     user-select: none;
+    -webkit-user-select: none; /* Prevent selection on iOS */
 
     font-weight: bold;
     padding: 0.5em 0.5em;
