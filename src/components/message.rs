@@ -72,20 +72,45 @@ impl Component for Message {
                         }
                     } else if !props.is_winner & !props.is_guessing {
                         let word = props.word.to_lowercase();
+
                         html! {
                             <>
                                 <a class="link" href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
                                     target="_blank">{ "Sanakirja" }
                                 </a>
                                 {" | "}
-                                <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
-                                    target="_blank">{ "Ehdota poistoa?" }
-                                </a>
+                                {
+                                    if matches!(props.game_mode, GameMode::DailyWord(_)) {
+                                        let callback = props.callback.clone();
+                                        let onclick = ctx.link().callback(move |e: MouseEvent| {
+                                            e.prevent_default();
+                                            callback.emit(GameMsg::ShareEmojis);
+                                            Msg::SetIsEmojisCopied(true)
+                                        });
+
+                                        html! {
+                                            if !self.is_emojis_copied {
+                                                <a class="link" href={"javascript:void(0)"} {onclick}>
+                                                    {"Kopioi pelisi?"}
+                                                </a>
+                                            } else {
+                                                <a class="link" {onclick}>
+                                                    {"Kopioitu!"}
+                                                </a>
+                                            }
+                                        }
+                                    } else {
+                                        html! {
+                                            <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
+                                                target="_blank">{ "Ehdota poistoa?" }
+                                            </a>
+                                        }
+                                    }
+                                }
                             </>
                         }
                     } else if !props.is_guessing && matches!(props.game_mode, GameMode::DailyWord(_)) {
                         let callback = props.callback.clone();
-
                         let onclick = ctx.link().callback(move |e: MouseEvent| {
                             e.prevent_default();
                             callback.emit(GameMsg::ShareEmojis);
