@@ -38,16 +38,18 @@ hr {
 }
 
 .modal {
-    position: fixed;
-    z-index: 3;
-    flex-grow: 1;
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%, 0%);
+    width: 80%;
     max-width: 390px;
+    z-index: 3;
     color: var(--white);
     font-size: 16px;
     max-height: 80%;
     overflow-y: auto;
-    margin: 30px;
     padding: 20px;
+    margin-top: 32px;
     border: solid 2px var(--absent);
     background-color: var(--background);
 }

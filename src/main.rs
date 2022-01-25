@@ -35,6 +35,7 @@ pub enum Msg {
     ChangeWordList(WordList),
     ChangeAllowProfanities(bool),
     ChangeTheme(Theme),
+    ShareEmojis,
 }
 
 pub struct App {
@@ -166,6 +167,21 @@ impl Component for App {
                 self.state.change_theme(theme);
                 true
             }
+            Msg::ShareEmojis => {
+                #[cfg(web_sys_unstable_apis)]
+                {
+                    use web_sys::Navigator;
+
+                    let message = self.state.share_emojis();
+                    let window: Window = window().expect("window not available");
+                    let navigator: Navigator = window.navigator();
+                    if let Some(clipboard) = navigator.clipboard() {
+                        let _promise = clipboard.write_text(message.as_str());
+                    }
+                }
+
+                true
+            }
         }
     }
 
@@ -251,5 +267,6 @@ impl Component for App {
 }
 
 fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
     yew::start_app::<App>();
 }

@@ -43,6 +43,8 @@ pub fn keyboard(props: &Props) -> Html {
                 is_guessing={props.is_guessing}
                 last_guess={props.last_guess.clone()}
                 word={props.word.clone()}
+                game_mode={props.game_mode}
+                callback={props.callback.clone()}
             />
 
             <div class="keyboard-row">

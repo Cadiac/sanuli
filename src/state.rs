@@ -5,7 +5,7 @@ use std::fmt;
 use std::mem;
 use std::rc::Rc;
 
-use chrono::{NaiveDate, Local};
+use chrono::{Local, NaiveDate};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
@@ -160,7 +160,11 @@ impl Default for State {
             current_word_length: DEFAULT_WORD_LENGTH,
             current_max_guesses: DEFAULT_MAX_GUESSES,
 
-            previous_game: (GameMode::default(), WordList::default(), DEFAULT_WORD_LENGTH),
+            previous_game: (
+                GameMode::default(),
+                WordList::default(),
+                DEFAULT_WORD_LENGTH,
+            ),
 
             theme: Theme::default(),
 
@@ -382,6 +386,11 @@ impl State {
                 self.max_streak = streak;
             }
         }
+    }
+
+    #[cfg(web_sys_unstable_apis)]
+    pub fn share_emojis(&self) -> String {
+        self.game.share_emojis(self.theme)
     }
 
     fn persist(&self) -> Result<(), StorageError> {
@@ -916,6 +925,49 @@ impl Game {
             self.current_guess += 1;
         }
         let _result = self.persist();
+    }
+
+    #[cfg(web_sys_unstable_apis)]
+    fn share_emojis(&self, theme: Theme) -> String {
+        let mut message = String::new();
+
+        if let GameMode::DailyWord(date) = self.game_mode {
+            let index = Game::get_daily_word_index(date) + 1;
+            let guess_count = if self.is_winner {
+                format!("{}", self.current_guess + 1)
+            } else {
+                "X".to_owned()
+            };
+
+            message += &format!("Sanuli #{} {}/{}", index, guess_count, self.max_guesses);
+            message += "\n\n";
+
+            for guess in self.guesses.iter() {
+                if guess.is_empty() {
+                    continue;
+                }
+                let guess_string = guess
+                    .iter()
+                    .map(|(_, state)| match state {
+                        TileState::Correct => match theme {
+                            Theme::Colorblind => "🟧",
+                            _ => "🟩",
+                        },
+                        TileState::Present => match theme {
+                            Theme::Colorblind => "🟦",
+                            _ => "🟨",
+                        },
+                        TileState::Absent => "⬛",
+                        TileState::Unknown => "⬜",
+                    })
+                    .collect::<String>();
+
+                message += &guess_string;
+                message += "\n";
+            }
+        }
+
+        message
     }
 
     pub fn persist(&self) -> Result<(), StorageError> {

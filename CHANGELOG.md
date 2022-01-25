@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.10 - 2022-01-25
+
+### Added
+- Sharing the daily sanuli solutions as emojis
+
+### Changed
+
+### Fixed
+
+
 ## v1.9 - 2022-01-24
 
 ### Added
