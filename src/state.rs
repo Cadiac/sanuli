@@ -8,6 +8,7 @@ use std::rc::Rc;
 use chrono::{Local, NaiveDate};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
+use web_sys::{window, Window};
 
 use crate::migration;
 
@@ -184,7 +185,7 @@ impl State {
         let word_lists = parse_all_words();
 
         // Attempt to rehydrate state from localStorage
-        if let Ok(mut state) = State::rehydrate() {
+        let mut initial_state = if let Ok(mut state) = State::rehydrate() {
             if let GameMode::DailyWord(date) = state.current_game_mode {
                 let today = Local::today().naive_local();
 
@@ -235,7 +236,36 @@ impl State {
             let _res = state.game.persist();
 
             state
+        };
+
+        if let Some(game) = initial_state.restore_shared_game() {
+            initial_state.game = game;
         }
+
+        initial_state
+    }
+
+    fn restore_shared_game(&self) -> Option<Game> {
+        let window: Window = window().expect("window not available");
+        let hash = window.location().hash().ok()?;
+        window.location().set_hash("").ok()?;
+
+        if hash.is_empty() {
+            return None;
+        }
+
+        let game_str = window
+            .atob(hash.chars().skip(1).collect::<String>().as_str())
+            .ok()?;
+
+        let mut game: Game = serde_json::from_str(&game_str).ok()?;
+
+        game.allow_profanities = self.allow_profanities;
+        game.word_lists = self.word_lists.clone();
+
+        game.recalculate();
+
+        return Some(game);
     }
 
     pub fn submit_guess(&mut self) -> bool {
@@ -404,6 +434,11 @@ impl State {
     #[cfg(web_sys_unstable_apis)]
     pub fn share_emojis(&self) -> String {
         self.game.share_emojis(self.theme)
+    }
+
+    #[cfg(web_sys_unstable_apis)]
+    pub fn share_link(&self) -> Option<String> {
+        self.game.share_link()
     }
 
     fn persist(&self) -> Result<(), StorageError> {
@@ -983,6 +1018,41 @@ impl Game {
         message
     }
 
+    #[cfg(web_sys_unstable_apis)]
+    fn share_link(&self) -> Option<String> {
+        let game_str = serde_json::to_string(self).ok()?;
+        let window: Window = window().expect("window not available");
+        let share_str = window.btoa(&game_str).ok()?;
+        let base_url = window.location().origin().ok()?;
+
+        Some(format!("{}/#{}", base_url, share_str))
+    }
+
+    fn recalculate(&mut self) {
+        self.known_states = std::iter::repeat(HashMap::new())
+            .take(self.max_guesses)
+            .collect::<Vec<_>>();
+
+        self.discovered_counts = std::iter::repeat(HashMap::new())
+            .take(self.max_guesses)
+            .collect::<Vec<_>>();
+
+        let current_guess = self.current_guess;
+        // Rerrun the game to repuplate known_states and discovered_counts
+        for guess_index in 0..self.current_guess {
+            self.current_guess = guess_index;
+            self.calculate_current_guess();
+        }
+
+        // Restore the current guess
+        self.current_guess = current_guess;
+
+        // If the game is ended also recalculate the current guess
+        if !self.is_guessing {
+            self.calculate_current_guess();
+        }
+    }
+
     pub fn persist(&self) -> Result<(), StorageError> {
         let game_key = &format!(
             "game|{}|{}|{}",
@@ -1012,28 +1082,7 @@ impl Game {
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
 
-        game.known_states = std::iter::repeat(HashMap::new())
-            .take(game.max_guesses)
-            .collect::<Vec<_>>();
-
-        game.discovered_counts = std::iter::repeat(HashMap::new())
-            .take(game.max_guesses)
-            .collect::<Vec<_>>();
-
-        let current_guess = game.current_guess;
-        // Rerrun the game to repuplate known_states and discovered_counts
-        for guess_index in 0..game.current_guess {
-            game.current_guess = guess_index;
-            game.calculate_current_guess();
-        }
-
-        // Restore the current guess
-        game.current_guess = current_guess;
-
-        // If the game is ended also recalculate the current guess
-        if !game.is_guessing {
-            game.calculate_current_guess();
-        }
+        game.recalculate();
 
         Ok(game)
     }

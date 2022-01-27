@@ -36,6 +36,7 @@ pub enum Msg {
     ChangeAllowProfanities(bool),
     ChangeTheme(Theme),
     ShareEmojis,
+    ShareLink,
 }
 
 pub struct App {
@@ -172,14 +173,28 @@ impl Component for App {
                 {
                     use web_sys::Navigator;
 
-                    let message = self.state.share_emojis();
+                    let emojis = self.state.share_emojis();
                     let window: Window = window().expect("window not available");
                     let navigator: Navigator = window.navigator();
                     if let Some(clipboard) = navigator.clipboard() {
-                        let _promise = clipboard.write_text(message.as_str());
+                        let _promise = clipboard.write_text(emojis.as_str());
                     }
                 }
+                true
+            }
+            Msg::ShareLink => {
+                #[cfg(web_sys_unstable_apis)]
+                {
+                    use web_sys::Navigator;
 
+                    if let Some(link) = self.state.share_link() {
+                        let window: Window = window().expect("window not available");
+                        let navigator: Navigator = window.navigator();
+                        if let Some(clipboard) = navigator.clipboard() {
+                            let _promise = clipboard.write_text(link.as_str());
+                        }
+                    }
+                }
                 true
             }
         }
