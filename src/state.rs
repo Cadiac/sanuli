@@ -1020,7 +1020,11 @@ impl Game {
 
     #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
-        let game_str = serde_json::to_string(self).ok()?;
+        let mut game = self.clone();
+        game.message = EMPTY.to_string();
+        game.is_reset = false;
+
+        let game_str = serde_json::to_string(&game).ok()?;
         let window: Window = window().expect("window not available");
         let share_str = window.btoa(&game_str).ok()?;
         let base_url = window.location().origin().ok()?;
