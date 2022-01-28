@@ -272,6 +272,11 @@ impl State {
         if matches!(new_mode, GameMode::DailyWord(_)) {
             self.current_word_list = WordList::Daily;
             self.current_word_length = DAILY_WORD_LEN;
+        } else if self.current_word_list == WordList::Daily {
+            // Prevent getting stuck in non-daily word gamemode with
+            // daily list somehow, for instance by having a daily game as
+            // the previous game in state
+            self.current_word_list = WordList::default();
         }
 
         self.current_game_mode = new_mode;
@@ -295,9 +300,17 @@ impl State {
     pub fn change_previous_game_mode(&mut self) {
         let (game_mode, word_list, word_length) = self.previous_game;
 
-        self.current_game_mode = game_mode;
-        self.current_word_list = word_list;
-        self.current_word_length = word_length;
+        if matches!(game_mode, GameMode::DailyWord(_)) && matches!(self.current_game_mode, GameMode::DailyWord(_)) {
+            // Force the user to reset to the base game
+            self.current_game_mode = GameMode::default();
+            self.current_word_list = WordList::default();
+            self.current_word_length = DEFAULT_WORD_LENGTH;
+        } else {
+            self.current_game_mode = game_mode;
+            self.current_word_list = word_list;
+            self.current_word_length = word_length;
+        }
+
         self.switch_active_game();
 
         let _res = self.persist();
