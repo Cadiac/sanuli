@@ -30,6 +30,7 @@ impl fmt::Display for GameMode {
             GameMode::Classic => write!(f, "classic"),
             GameMode::Relay => write!(f, "relay"),
             GameMode::DailyWord(_) => write!(f, "daily_word"),
+            GameMode::Shared => write!(f, "shared"),
         }
     }
 }

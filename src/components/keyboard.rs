@@ -17,6 +17,7 @@ pub struct Props {
     pub is_unknown: bool,
     pub is_winner: bool,
     pub is_guessing: bool,
+    pub is_hidden: bool,
     pub game_mode: GameMode,
 
     pub message: String,
@@ -56,8 +57,14 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
+                        let tile_state = if !props.is_hidden {
+                            props.keyboard.get(key).unwrap().to_string()
+                        } else {
+                            TileState::Unknown.to_string()
+                        };
+
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", props.keyboard.get(key).unwrap().to_string())}
+                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
                                 onmousedown={onkeypress}>
                                 { key }
                             </button>
@@ -78,8 +85,14 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
+                        let tile_state = if !props.is_hidden {
+                            props.keyboard.get(key).unwrap().to_string()
+                        } else {
+                            TileState::Unknown.to_string()
+                        };
+
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", props.keyboard.get(key).unwrap().to_string())}
+                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
                                 onmousedown={onkeypress}>
                                 { key }
                             </button>
@@ -99,8 +112,14 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
+                        let tile_state = if !props.is_hidden {
+                            props.keyboard.get(key).unwrap().to_string()
+                        } else {
+                            TileState::Unknown.to_string()
+                        };
+
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", props.keyboard.get(key).unwrap().to_string())}
+                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
                                 onmousedown={onkeypress}>{ key }</button>
                         }
                     }).collect::<Html>()

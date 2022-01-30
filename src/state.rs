@@ -76,6 +76,7 @@ pub enum GameMode {
     Classic,
     Relay,
     DailyWord(NaiveDate),
+    Shared,
 }
 
 impl Default for GameMode {
@@ -247,25 +248,28 @@ impl State {
 
     fn restore_shared_game(&self) -> Option<Game> {
         let window: Window = window().expect("window not available");
-        let hash = window.location().hash().ok()?;
-        window.location().set_hash("").ok()?;
-
-        if hash.is_empty() {
+        let qs = window.location().search().ok()?;
+        if qs.is_empty() {
             return None;
         }
 
-        let game_str = window
-            .atob(hash.chars().skip(1).collect::<String>().as_str())
-            .ok()?;
+        // Skip the leading "?"
+        for param in qs.chars().skip(1).collect::<String>().split("&") {
+            let mut parts = param.split("=");
 
-        let mut game: Game = serde_json::from_str(&game_str).ok()?;
+            let key = parts.next()?;
+            let value = parts.next()?;
 
-        game.allow_profanities = self.allow_profanities;
-        game.word_lists = self.word_lists.clone();
+            if key == "game" && !value.is_empty() {
+                let game_str = window
+                    .atob(value)
+                    .ok()?;
 
-        game.recalculate();
+                return Game::from_shared_link(&game_str, self.word_lists.clone());
+            }
+        }
 
-        return Some(game);
+        return None;
     }
 
     pub fn submit_guess(&mut self) -> bool {
@@ -330,7 +334,9 @@ impl State {
     pub fn change_previous_game_mode(&mut self) {
         let (game_mode, word_list, word_length) = self.previous_game;
 
-        if matches!(game_mode, GameMode::DailyWord(_)) && matches!(self.current_game_mode, GameMode::DailyWord(_)) {
+        if matches!(game_mode, GameMode::DailyWord(_))
+            && matches!(self.current_game_mode, GameMode::DailyWord(_))
+        {
             // Force the user to reset to the base game
             self.current_game_mode = GameMode::default();
             self.current_word_list = WordList::default();
@@ -471,6 +477,8 @@ pub struct Game {
     pub message: String,
 
     #[serde(skip)]
+    pub is_hidden: bool,
+    #[serde(skip)]
     pub allow_profanities: bool,
     #[serde(skip)]
     pub word_lists: Rc<WordLists>,
@@ -541,6 +549,7 @@ impl Game {
             is_winner: false,
             is_unknown: false,
             is_reset: false,
+            is_hidden: false,
             message: EMPTY.to_string(),
             known_states,
             discovered_counts,
@@ -549,6 +558,62 @@ impl Game {
             current_guess: 0,
             streak: 0,
         }
+    }
+
+    pub fn from_shared_link(game_str: &str, word_lists: Rc<WordLists>) -> Option<Self> {
+        let max_guesses = DEFAULT_MAX_GUESSES;
+
+        let mut parts = game_str.split("|");
+        let word = parts.next()?.chars().collect::<Vec<_>>();
+        let word_length = word.len();
+
+        let guesses_str = parts.next()?;
+
+        let mut guesses = guesses_str
+            .chars()
+            .map(|c| (c, TileState::Unknown))
+            .collect::<Vec<_>>()
+            .chunks(5)
+            .map(|chunk| chunk.to_vec())
+            .collect::<Vec<_>>();
+
+        let current_guess = guesses.len();
+
+        guesses.resize(max_guesses, Vec::with_capacity(word_length));
+
+        let known_states = std::iter::repeat(HashMap::new())
+            .take(max_guesses)
+            .collect::<Vec<_>>();
+
+        let discovered_counts = std::iter::repeat(HashMap::new())
+            .take(max_guesses)
+            .collect::<Vec<_>>();
+
+        let mut game = Self {
+            game_mode: GameMode::Shared,
+            word_list: WordList::Full,
+            word_lists,
+            word_length,
+            max_guesses,
+            word,
+            allow_profanities: true,
+            is_guessing: false,
+            is_winner: false,
+            is_unknown: false,
+            is_reset: false,
+            is_hidden: true,
+            message: EMPTY.to_string(),
+            known_states,
+            discovered_counts,
+            guesses,
+            previous_guesses: Vec::new(),
+            current_guess,
+            streak: 0,
+        };
+
+        game.recalculate();
+
+        return Some(game);
     }
 
     fn new_or_rehydrate(
@@ -1020,16 +1085,19 @@ impl Game {
 
     #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
-        let mut game = self.clone();
-        game.message = EMPTY.to_string();
-        game.is_reset = false;
-
-        let game_str = serde_json::to_string(&game).ok()?;
+        let game_str = format!(
+            "{}|{}",
+            self.word.iter().collect::<String>(),
+            self.guesses
+                .iter()
+                .flat_map(|guess| guess.iter().map(|(c, _)| c))
+                .collect::<String>(),
+        );
         let window: Window = window().expect("window not available");
         let share_str = window.btoa(&game_str).ok()?;
         let base_url = window.location().origin().ok()?;
 
-        Some(format!("{}/#{}", base_url, share_str))
+        Some(format!("{}/?game={}", base_url, share_str))
     }
 
     fn recalculate(&mut self) {
