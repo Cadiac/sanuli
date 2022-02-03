@@ -604,11 +604,6 @@ impl Game {
             self.current_guess += 1;
         }
 
-        if matches!(self.game_mode, GameMode::Shared) {
-            // Don't persist shared games
-            return;
-        }
-
         let _result = self.persist();
     }
 
@@ -735,6 +730,7 @@ impl Game {
 
     pub fn persist(&self) -> Result<(), StorageError> {
         if self.game_mode == GameMode::Shared {
+            // Never persist shared games
             return Ok(());
         }
 

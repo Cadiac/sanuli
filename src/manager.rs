@@ -494,6 +494,7 @@ impl Manager {
 
     fn persist(&self) -> Result<(), StorageError> {
         if self.current_game_mode == GameMode::Shared {
+            // Never persist shared games
             return Ok(());
         }
 
