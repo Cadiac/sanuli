@@ -291,7 +291,7 @@ impl Manager {
 
             if key == "peli" && !value.is_empty() {
                 // Replace URL safe characters back to +/=
-                let base64 = value.replace("-", "+").replace("_", "/").replace(".", "=");
+                let base64 = value.replace("-", "+").replace(".", "/").replace("_", "=");
 
                 let game_str = window
                     .atob(&base64)

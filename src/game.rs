@@ -670,13 +670,14 @@ impl Game {
         let base_url = window.location().origin().ok()?;
 
         // Replace +/= at the base64 with URL safe characters
-        let safe_str = share_str.replace("+", "-").replace("/", "_").replace("=", ".");
+        let safe_str = share_str.replace("+", "-").replace("/", ".").replace("=", "_");
 
         Some(format!("{}/?peli={}", base_url, safe_str))
     }
 
     pub fn reveal_hidden_tiles(&mut self) -> bool {
         self.is_hidden = false;
+        self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
         true
     }
 
