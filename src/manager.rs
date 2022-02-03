@@ -290,8 +290,11 @@ impl Manager {
             let value = parts.next()?;
 
             if key == "peli" && !value.is_empty() {
+                // Replace URL safe characters back to +/=
+                let base64 = value.replace("-", "+").replace("_", "/").replace(".", "=");
+
                 let game_str = window
-                    .atob(value)
+                    .atob(&base64)
                     .ok()?;
 
                 let game = Game::from_shared_link(&game_str, self.word_lists.clone());

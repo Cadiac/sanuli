@@ -134,7 +134,7 @@ impl Game {
             .chars()
             .map(|c| (c, TileState::Unknown))
             .collect::<Vec<_>>()
-            .chunks(5)
+            .chunks(word_length)
             .map(|chunk| chunk.to_vec())
             .collect::<Vec<_>>();
 
@@ -669,7 +669,10 @@ impl Game {
         let share_str = window.btoa(&game_str).ok()?;
         let base_url = window.location().origin().ok()?;
 
-        Some(format!("{}/?peli={}", base_url, share_str))
+        // Replace +/= at the base64 with URL safe characters
+        let safe_str = share_str.replace("+", "-").replace("/", "_").replace("=", ".");
+
+        Some(format!("{}/?peli={}", base_url, safe_str))
     }
 
     pub fn reveal_hidden_tiles(&mut self) -> bool {
@@ -714,7 +717,7 @@ impl Game {
             .collect::<Vec<_>>();
 
         let current_guess = self.current_guess;
-        // Rerrun the game to repuplate known_states and discovered_counts
+        // Rerun the game to repuplate known_states and discovered_counts
         for guess_index in 0..self.current_guess {
             self.current_guess = guess_index;
             self.calculate_current_guess();
