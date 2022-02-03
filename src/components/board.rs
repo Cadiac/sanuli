@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::state::TileState;
+use crate::manager::TileState;
 
 #[derive(Properties, PartialEq)]
 pub struct Props {

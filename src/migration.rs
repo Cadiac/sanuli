@@ -6,7 +6,8 @@ use chrono::{Local, NaiveDate};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-use crate::state::{Game, GameMode, State, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
+use crate::manager::{GameMode, Manager, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
+use crate::game::{Game};
 
 impl FromStr for GameMode {
     type Err = ();
@@ -60,30 +61,9 @@ impl fmt::Display for WordList {
     }
 }
 
-impl FromStr for Theme {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<Theme, Self::Err> {
-        match input {
-            "dark" => Ok(Theme::Dark),
-            "colorblind" => Ok(Theme::Colorblind),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for Theme {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Theme::Dark => write!(f, "dark"),
-            Theme::Colorblind => write!(f, "colorblind"),
-        }
-    }
-}
-
 // Migrate the old game data to the new format, removing old data from localStorage.
 // TODO: Get rid of this at some point, even if that means data loss to some players
-pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
+pub fn migrate_settings_and_stats(manager: &mut Manager) -> Result<(), JsValue> {
     let window: Window = window().expect("window not available");
     if let Some(local_storage) = window.local_storage().expect("local storage not available") {
         // Daily words
@@ -113,14 +93,14 @@ pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
                         let game_id = (GameMode::DailyWord(date), WordList::Daily, DAILY_WORD_LEN);
 
                         if let hash_map::Entry::Vacant(entry) =
-                            state.background_games.entry(game_id)
+                            manager.background_games.entry(game_id)
                         {
                             let mut new_daily_game = Game::new(
                                 game_id.0,
                                 game_id.1,
                                 game_id.2,
-                                state.allow_profanities,
-                                state.word_lists.clone(),
+                                manager.allow_profanities,
+                                manager.word_lists.clone(),
                             );
 
                             for (guess_index, guess) in previous_guesses.enumerate() {
@@ -154,18 +134,18 @@ pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
         // Current game
         if let Some(game_mode_str) = local_storage.get_item("game_mode")? {
             if let Ok(game_mode) = game_mode_str.parse::<GameMode>() {
-                state.current_game_mode = game_mode;
+                manager.current_game_mode = game_mode;
             }
             local_storage.remove_item("game_mode")?;
         }
 
         if let Some(word_list_str) = local_storage.get_item("word_list")? {
             if let Ok(word_list) = word_list_str.parse::<WordList>() {
-                if matches!(state.current_game_mode, GameMode::DailyWord(_)) {
+                if matches!(manager.current_game_mode, GameMode::DailyWord(_)) {
                     // Force the word list as daily word
-                    state.current_word_list = WordList::Daily;
+                    manager.current_word_list = WordList::Daily;
                 } else {
-                    state.current_word_list = word_list;
+                    manager.current_word_list = word_list;
                 }
             }
             local_storage.remove_item("word_list")?;
@@ -173,11 +153,11 @@ pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(word_length_str) = local_storage.get_item("word_length")? {
             if let Ok(word_length) = word_length_str.parse::<usize>() {
-                if matches!(state.current_game_mode, GameMode::DailyWord(_)) {
+                if matches!(manager.current_game_mode, GameMode::DailyWord(_)) {
                     // Force the word length for daily word
-                    state.current_word_length = DAILY_WORD_LEN;
+                    manager.current_word_length = DAILY_WORD_LEN;
                 } else {
-                    state.current_word_length = word_length;
+                    manager.current_word_length = word_length;
                 }
             }
             local_storage.remove_item("word_length")?;
@@ -185,40 +165,40 @@ pub fn migrate_settings_and_stats(state: &mut State) -> Result<(), JsValue> {
 
         if let Some(allow_profanities_str) = local_storage.get_item("allow_profanities")? {
             if let Ok(allow_profanities) = allow_profanities_str.parse::<bool>() {
-                state.allow_profanities = allow_profanities;
+                manager.allow_profanities = allow_profanities;
             }
             local_storage.remove_item("allow_profanities")?;
         }
 
         if let Some(theme_str) = local_storage.get_item("theme")? {
             if let Ok(theme) = theme_str.parse::<Theme>() {
-                state.theme = theme;
+                manager.theme = theme;
             }
             local_storage.remove_item("theme")?;
         }
 
         if let Some(message_str) = local_storage.get_item("message")? {
-            state.game.message = message_str;
+            manager.game.message = message_str;
             local_storage.remove_item("message")?;
         }
 
         if let Some(max_streak_str) = local_storage.get_item("max_streak")? {
             if let Ok(max_streak) = max_streak_str.parse::<usize>() {
-                state.max_streak = max_streak;
+                manager.max_streak = max_streak;
             }
             local_storage.remove_item("max_streak")?;
         }
 
         if let Some(total_played_str) = local_storage.get_item("total_played")? {
             if let Ok(total_played) = total_played_str.parse::<usize>() {
-                state.total_played = total_played;
+                manager.total_played = total_played;
             }
             local_storage.remove_item("total_played")?;
         }
 
         if let Some(total_solved_str) = local_storage.get_item("total_solved")? {
             if let Ok(total_solved) = total_solved_str.parse::<usize>() {
-                state.total_solved = total_solved;
+                manager.total_solved = total_solved;
             }
             local_storage.remove_item("total_solved")?;
         }

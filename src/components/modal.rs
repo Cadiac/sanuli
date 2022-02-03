@@ -1,7 +1,7 @@
 use yew::prelude::*;
 use chrono::{Local};
 
-use crate::state::{GameMode, WordList, Theme};
+use crate::manager::{GameMode, WordList, Theme};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";

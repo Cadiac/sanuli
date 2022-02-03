@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use yew::prelude::*;
 
-use crate::state::{TileState, GameMode};
+use crate::manager::{TileState, GameMode};
 use crate::Msg;
 
 use crate::components::{message::Message};
@@ -42,6 +42,7 @@ pub fn keyboard(props: &Props) -> Html {
                 is_unknown={props.is_unknown}
                 is_winner={props.is_winner}
                 is_guessing={props.is_guessing}
+                is_hidden={props.is_hidden}
                 last_guess={props.last_guess.clone()}
                 word={props.word.clone()}
                 game_mode={props.game_mode}
@@ -138,7 +139,7 @@ pub fn keyboard(props: &Props) -> Html {
                                 { "ARVAA" }
                             </button>
                         }
-                    } else if let GameMode::DailyWord(_) = props.game_mode {
+                    } else if matches!(props.game_mode, GameMode::DailyWord(_) | GameMode::Shared) {
                         let callback = props.callback.clone();
                         let onmousedown = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();
