@@ -263,7 +263,7 @@ impl Component for App {
 
                 {
                     if self.is_help_visible {
-                        html! { <HelpModal callback={link.callback(move |msg| msg)} /> }
+                        html! { <HelpModal theme={self.manager.theme} callback={link.callback(move |msg| msg)} /> }
                     } else {
                         html! {}
                     }

@@ -9,6 +9,7 @@ use chrono::{Local, NaiveDate};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use web_sys::{window, Window};
+use wasm_bindgen::{JsValue};
 
 use crate::migration;
 use crate::game::{Game};
@@ -293,13 +294,14 @@ impl Manager {
                     .atob(value)
                     .ok()?;
 
-                return Game::from_shared_link(&game_str, self.word_lists.clone());
+                let game = Game::from_shared_link(&game_str, self.word_lists.clone());
+
+                // Remove the query string
+                window.history().ok()?.replace_state_with_url(&JsValue::null(), "", Some("/")).ok()?;
+
+                return game;
             }
         }
-        
-        // TODO: Update history to remove the shared link from URL?
-
-        // TODO: Persist the shared games?
 
         return None;
     }
@@ -488,6 +490,10 @@ impl Manager {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
+        if self.current_game_mode == GameMode::Shared {
+            return Ok(());
+        }
+
         LocalStorage::set("settings", self)
     }
 

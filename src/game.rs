@@ -686,7 +686,7 @@ impl Game {
         self.is_unknown = false;
         self.is_reset = false;
         self.is_hidden = false;
-        self.message = "Arvaukset nollattu!".to_owned();
+        self.message = "Peli nollattu, arvaa sanuli!".to_owned();
 
         self.known_states = std::iter::repeat(HashMap::new())
             .take(self.max_guesses)
@@ -727,6 +727,10 @@ impl Game {
     }
 
     pub fn persist(&self) -> Result<(), StorageError> {
+        if self.game_mode == GameMode::Shared {
+            return Ok(());
+        }
+
         let game_key = &format!(
             "game|{}|{}|{}",
             serde_json::to_string(&self.game_mode).unwrap(),

@@ -22,10 +22,12 @@ pub struct Props {
 
 pub struct Message {
     is_emojis_copied: bool,
+    is_link_copied: bool,
 }
 
 pub enum Msg {
     SetIsEmojisCopied(bool),
+    SetIsLinkCopied(bool),
 }
 
 impl Component for Message {
@@ -35,6 +37,7 @@ impl Component for Message {
     fn create(_ctx: &Context<Self>) -> Self {
         Self {
             is_emojis_copied: false,
+            is_link_copied: false,
         }
     }
 
@@ -42,6 +45,11 @@ impl Component for Message {
         match msg {
             Msg::SetIsEmojisCopied(is_copied) => {
                 self.is_emojis_copied = is_copied;
+                self.is_link_copied = false;
+            }
+            Msg::SetIsLinkCopied(is_copied) => {
+                self.is_link_copied = is_copied;
+                self.is_emojis_copied = false;
             }
         }
         true
@@ -55,6 +63,10 @@ impl Component for Message {
         if self.is_emojis_copied {
             ctx.link().send_message(Msg::SetIsEmojisCopied(false));
         }
+
+        if self.is_link_copied {
+            ctx.link().send_message(Msg::SetIsLinkCopied(false));
+        }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
@@ -63,7 +75,7 @@ impl Component for Message {
         html! {
             <div class="message">
                 { &props.message }
-                <div class="message-small">{{
+                <div class="message-small">{
                     if props.is_hidden {
                         let callback = props.callback.clone();
                         let reveal_hidden_tiles = ctx.link().callback(move |e: MouseEvent| {
@@ -88,70 +100,63 @@ impl Component for Message {
                                 </a>
                             </>
                         }
-                    } else if props.is_unknown {
+                    } else if !props.is_guessing {
+                        self.share_message_view(ctx)
+                    } else if props.is_guessing && props.is_unknown {
                         let last_guess = props.last_guess.to_lowercase();
                         html! {
                             <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_ADD, last_guess)}
                                 target="_blank">{ "Ehdota lisäystä?" }
                             </a>
                         }
-                    } else if !props.is_winner & !props.is_guessing {
-                        let word = props.word.to_lowercase();
+                    } else {
+                        html! {}
+                    }
+                }
+                </div>
+            </div>
+        }
+    }
+}
 
-                        html! {
-                            <>
-                                <a class="link" href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
-                                    target="_blank">{ "Sanakirja" }
-                                </a>
-                                {" | "}
-                                {
-                                    if matches!(props.game_mode, GameMode::DailyWord(_)) {
-                                        let callback = props.callback.clone();
-                                        let onclick = ctx.link().callback(move |e: MouseEvent| {
-                                            e.prevent_default();
-                                            callback.emit(GameMsg::ShareEmojis);
-                                            Msg::SetIsEmojisCopied(true)
-                                        });
+impl Message {
+    fn share_message_view(&self, ctx: &Context<Self>) -> Html {
+        let props = ctx.props();
+        let word = props.word.to_lowercase();
 
-                                        html! {
-                                            if !self.is_emojis_copied {
-                                                <a class="link" href={"javascript:void(0)"} {onclick}>
-                                                    {"Kopioi pelisi?"}
-                                                </a>
-                                            } else {
-                                                <a class="link" {onclick}>
-                                                    {"Kopioitu!"}
-                                                </a>
-                                            }
-                                        }
-                                    } else {
-                                        html! {
-                                            <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
-                                                target="_blank">{ "Ehdota poistoa?" }
-                                            </a>
-                                        }
-                                    }
-                                }
-                            </>
+        let callback = props.callback.clone();
+        let share_emojis = ctx.link().callback(move |e: MouseEvent| {
+            e.prevent_default();
+            callback.emit(GameMsg::ShareEmojis);
+            Msg::SetIsEmojisCopied(true)
+        });
+        let callback = props.callback.clone();
+        let share_link = ctx.link().callback(move |e: MouseEvent| {
+            e.prevent_default();
+            callback.emit(GameMsg::ShareLink);
+            Msg::SetIsLinkCopied(true)
+        });
+
+        html! {
+            <>
+                <a class="link" href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
+                    target="_blank">{ "Sanakirja" }
+                </a>
+                {" | "}
+                <a class="link" href={"javascript:void(0)"} onclick={share_link}>
+                    {
+                        if !self.is_link_copied {
+                            {"Linkki"}
+                        } else {
+                            {"Kopioitu!"}
                         }
-                    } else if !props.is_guessing && matches!(props.game_mode, GameMode::DailyWord(_)) {
-                        let callback = props.callback.clone();
-                        let share_emojis = ctx.link().callback(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(GameMsg::ShareEmojis);
-                            Msg::SetIsEmojisCopied(true)
-                        });
-                        let callback = props.callback.clone();
-                        let share_link = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(GameMsg::ShareLink);
-                        });
-
+                    }
+                </a>
+                {
+                    if matches!(props.game_mode, GameMode::DailyWord(_)) {
                         html! {
                             <>
-                                <a>
-                                    {"Jaa ratkaisu:\u{00a0}"}
-                                </a>
+                                {" | "}
                                 <a class="link" href={"javascript:void(0)"} onclick={share_emojis}>
                                     {
                                         if !self.is_emojis_copied {
@@ -161,18 +166,22 @@ impl Component for Message {
                                         }
                                     }
                                 </a>
+                            </>
+                        }
+                    } else if !props.is_winner {
+                        html! {
+                            <>
                                 {" | "}
-                                <a class="link" href={"javascript:void(0)"} onclick={share_link}>
-                                    {"Linkki"}
+                                <a class="link" href={format!("{}{}", FORMS_LINK_TEMPLATE_DEL, word)}
+                                    target="_blank">{ "Ehdota poistoa?" }
                                 </a>
                             </>
                         }
                     } else {
                         html! {}
                     }
-                }}
-                </div>
-            </div>
+                }
+            </>
         }
     }
 }
