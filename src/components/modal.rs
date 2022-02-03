@@ -1,12 +1,12 @@
 use yew::prelude::*;
 use chrono::{Local};
 
-use crate::state::{GameMode, WordList, Theme};
+use crate::manager::{GameMode, WordList, Theme};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
-const VERSION: &str = "v1.11";
+const VERSION: &str = "v1.12";
 
 macro_rules! onmousedown {
     ( $cb:ident, $msg:expr ) => {
@@ -22,6 +22,7 @@ macro_rules! onmousedown {
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct HelpModalProps {
+    pub theme: Theme,
     pub callback: Callback<Msg>
 }
 
@@ -44,8 +45,30 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 <div class={classes!("tile", "absent")}>{"A"}</div>
             </div>
     
-            <p><span class="present">{"Keltainen"}</span>{": kirjain löytyy kätketystä sanasta, mutta on arvauksessa väärällä paikalla."}</p>
-            <p><span class="correct">{"Vihreä"}</span>{": kirjain on arvauksessa oikealla paikalla."}</p>
+            <p>
+                {
+                    html! {
+                        if props.theme == Theme::Colorblind {
+                            <span class="present">{"Sininen"}</span>
+                        } else {
+                            <span class="present">{"Keltainen"}</span>
+                        }
+                    }
+                }
+                {": kirjain löytyy kätketystä sanasta, mutta on arvauksessa väärällä paikalla."}
+            </p>
+            <p>
+                {
+                    html! {
+                        if props.theme == Theme::Colorblind {
+                            <span class="correct">{"Oranssi"}</span>
+                        } else {
+                            <span class="correct">{"Vihreä"}</span>
+                        }
+                    }
+                }
+                {": kirjain on arvauksessa oikealla paikalla."}
+            </p>
             <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
     
             <p>
@@ -102,12 +125,12 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
-    let is_daily_word = matches!(props.game_mode, GameMode::DailyWord(_));
+    let is_hide_settings = matches!(props.game_mode, GameMode::DailyWord(_) | GameMode::Shared);
 
     html! {
         <div class="modal">
             <span onmousedown={toggle_menu} class="modal-close">{"✖"}</span>
-            {if !is_daily_word {
+            {if !is_hide_settings {
                 html! {
                     <>
                         <div>
@@ -165,7 +188,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", is_daily_word.then(|| Some("select-active")))}
+                    <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
                     </button>

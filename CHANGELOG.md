@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.12 - 2022-02-03
+### Added
+- Game can now be shared as a link, and the party receiving the link can either just view the solution or try it by themselves.
+
+### Fixed
+- Color descriptions on the help page were wrong when the colorblind theme was selected.
+
+### Changed
+- Some refactoring, state.rs had grown too big and is now split to game and manager.
+
+
 ## v1.11 - 2022-01-29
 
 ### Fixed

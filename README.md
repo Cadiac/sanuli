@@ -16,28 +16,28 @@ Follow [Rust](https://www.rust-lang.org/en-US/install.html) installation instruc
 To build the WASM based [yew](https://yew.rs/) UI, further wasm tooling is required
 
 ```
-$ rustup target add wasm32-unknown-unknown
-$ cargo install --locked trunk
-$ cargo install wasm-bindgen-cli
+rustup target add wasm32-unknown-unknown
+cargo install --locked trunk
+cargo install wasm-bindgen-cli
 ```
 
 Create word list files and populate them with uppercase words, one per line
 
 ```
-$ touch common-words.txt
-$ touch daily-words.txt
-$ touch full-words.txt
-$ touch profanities.txt
+touch common-words.txt
+touch daily-words.txt
+touch full-words.txt
+touch profanities.txt
 ```
 
 Start the UI in development mode
 ```
-$ trunk serve
+trunk serve
 ```
 
 ## Word lists
 
-Three separate word list files in the root of this project containing all the words are required. The lists are not included in this repository.
+Four separate word list files in the root of this project containing all the words are required. The lists are not included in this repository.
 
 The lists are:
 - `full-words.txt` - Full list of all accepted 5 and 6 character words. The checks if a word real or not is done against this list
@@ -49,22 +49,34 @@ Beware that these are _included in the release binary_, and anyone can obtain th
 
 ## Generating base word lists
 
-To create a word list, a dictionary like the "nykysuomen sanalista" by [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/), licensed with [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/deed.fi), can be used as a baseline.
+To create a word list, a dictionary like the "nykysuomen sanalista" by [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/),
+licensed with [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/deed.fi), can be used as a baseline to build from.
 
 A parser for parsing `kotus-sanalista_v1.xml` file from [Kotus](https://kaino.kotus.fi/sanat/nykysuomi/) is included:
 
 ```bash
-$ cargo run --bin parse-kotus-word-list your/path/to/kotus-sanalista_v1.xml
+cargo run --bin parse-kotus-word-list your/path/to/kotus-sanalista_v1.xml
 ```
 
 which creates a `full-words-generated.txt` file in the working directory.
 
 ## Development
 
-For development, start the web server with
+**NOTE:** Rust flag `--cfg=web_sys_unstable_apis` is required for copying to clipboard to work.
+Clipboard API also only works in HTTPS context.
+
+To set the flag manually with environment variables, run:
+```
+export RUSTFLAGS=--cfg=web_sys_unstable_apis
+```
+
+You can ignore this at manual development (as the clipboard API won't work without HTTPS anywaays)
+or run your trunk commands with it set.
+
+For normal development, start the web server with
 
 ```
-$ RUSTFLAGS=--cfg=web_sys_unstable_apis trunk serve
+trunk serve
 ```
 
 This should make the UI available at 0.0.0.0:8080 with hot reload on code changes.
@@ -72,7 +84,7 @@ This should make the UI available at 0.0.0.0:8080 with hot reload on code change
 To change the default port, use
 
 ```
-$ RUSTFLAGS=--cfg=web_sys_unstable_apis trunk serve --port=9090
+trunk serve --port=9090
 ```
 
 ## Release build

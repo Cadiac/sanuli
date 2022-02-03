@@ -1,11 +1,12 @@
 use yew::prelude::*;
 
-use crate::state::TileState;
+use crate::manager::TileState;
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub is_guessing: bool,
     pub is_reset: bool,
+    pub is_hidden: bool,
 
     pub guesses: Vec<Vec<(char, TileState)>>,
     pub previous_guesses: Vec<Vec<(char, TileState)>>,
@@ -52,7 +53,13 @@ pub fn board(props: &Props) -> Html {
                                                 tile_state.to_string(),
                                                 is_current_row.then(|| Some("current"))
                                             )}>
-                                                { character }
+                                                {
+                                                    if props.is_hidden {
+                                                        ' '
+                                                    } else {
+                                                        *character
+                                                    }
+                                                }
                                             </div>
                                         }
                                     }).collect::<Html>()

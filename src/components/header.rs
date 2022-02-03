@@ -1,6 +1,6 @@
 use yew::prelude::*;
 
-use crate::state::GameMode;
+use crate::manager::GameMode;
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct Props {
