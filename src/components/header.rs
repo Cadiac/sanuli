@@ -34,8 +34,10 @@ pub fn header(props: &Props) -> Html {
         <header>
             <nav onclick={onclick_help} class="title-icon">{"?"}</nav>
             {
-                if let GameMode::DailyWord(_) = props.game_mode {
+                if matches!(props.game_mode, GameMode::DailyWord(_)) {
                     html! { <h1 class="title">{format!("Päivän sanuli #{}", props.daily_word_number)}</h1> }
+                } else if props.game_mode == GameMode::Shared {
+                    html! { <h1 class="title">{ "Jaettu sanuli" }</h1> }
                 } else if props.streak > 0 {
                     html! { <h1 class="title">{format!("Sanuli — Putki: {}", props.streak)}</h1> }
                 } else {
