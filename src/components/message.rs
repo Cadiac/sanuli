@@ -91,12 +91,12 @@ impl Component for Message {
 
                         html! {
                             <>
-                                <a class="link" href={"javascript:void(0)"} onclick={reveal_hidden_tiles}>
-                                    {"Paljasta ratkaisu"}
+                                <a class="link" href={"javascript:void(0)"} onclick={reset_game}>
+                                    {"Kokeile ratkaista"}
                                 </a>
                                 {" | "}
-                                <a class="link" href={"javascript:void(0)"} onclick={reset_game}>
-                                    {"Kokeile itse"}
+                                <a class="link" href={"javascript:void(0)"} onclick={reveal_hidden_tiles}>
+                                    {"Paljasta"}
                                 </a>
                             </>
                         }
