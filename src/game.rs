@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use web_sys::{window, Window};
 
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, TileState, WordList, WordLists, Theme
+    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists,
 };
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
@@ -519,15 +519,18 @@ impl Game {
     }
 
     fn is_guess_real_word(&self) -> bool {
-        match self.word_lists.get(&(WordList::Full, self.word_length)) {
-            Some(list) => {
-                let word: &Vec<char> = &self.guesses[self.current_guess]
-                    .iter()
-                    .map(|(c, _)| *c)
-                    .collect();
+        // Always allow correct words, even if they aren't on the list
+        if self.is_correct_word() {
+            return true;
+        }
 
-                list.contains(word)
-            }
+        let word: &Vec<char> = &self.guesses[self.current_guess]
+            .iter()
+            .map(|(c, _)| *c)
+            .collect();
+
+        match self.word_lists.get(&(WordList::Full, self.word_length)) {
+            Some(list) => list.contains(word),
             None => false,
         }
     }
