@@ -18,6 +18,10 @@ pub struct Props {
     pub is_winner: bool,
     pub is_guessing: bool,
     pub is_hidden: bool,
+
+    pub is_emojis_copied: bool,
+    pub is_link_copied: bool,
+
     pub game_mode: GameMode,
 
     pub message: String,
@@ -43,6 +47,10 @@ pub fn keyboard(props: &Props) -> Html {
                 is_winner={props.is_winner}
                 is_guessing={props.is_guessing}
                 is_hidden={props.is_hidden}
+
+                is_emojis_copied={props.is_emojis_copied}
+                is_link_copied={props.is_link_copied}
+
                 last_guess={props.last_guess.clone()}
                 word={props.word.clone()}
                 game_mode={props.game_mode}

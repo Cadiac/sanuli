@@ -47,6 +47,8 @@ pub struct App {
     manager: Manager,
     is_help_visible: bool,
     is_menu_visible: bool,
+    is_emojis_copied: bool,
+    is_link_copied: bool,
     keyboard_listener: Option<Closure<dyn Fn(KeyboardEvent)>>,
 }
 
@@ -59,6 +61,8 @@ impl Component for App {
             manager: Manager::new(),
             is_help_visible: false,
             is_menu_visible: false,
+            is_emojis_copied: false,
+            is_link_copied: false,
             keyboard_listener: None,
         }
     }
@@ -129,7 +133,12 @@ impl Component for App {
                 true
             }
             Msg::Guess => self.manager.submit_guess(),
-            Msg::NextWord => self.manager.game.next_word(),
+            Msg::NextWord => {
+                self.manager.game.next_word();
+                self.is_emojis_copied = false;
+                self.is_link_copied = false;
+                true
+            }
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
@@ -160,6 +169,8 @@ impl Component for App {
             }
             Msg::ChangePreviousGameMode => {
                 self.manager.change_previous_game_mode();
+                self.is_emojis_copied = false;
+                self.is_link_copied = false;
                 true
             }
             Msg::ChangeAllowProfanities(is_allowed) => {
@@ -183,6 +194,8 @@ impl Component for App {
                         let _promise = clipboard.write_text(emojis.as_str());
                     }
                 }
+                self.is_emojis_copied = true;
+                self.is_link_copied = false;
                 true
             }
             Msg::ShareLink => {
@@ -198,6 +211,8 @@ impl Component for App {
                         }
                     }
                 }
+                self.is_link_copied = true;
+                self.is_emojis_copied = false;
                 true
             },
             Msg::RevealHiddenTiles => {
@@ -253,6 +268,8 @@ impl Component for App {
                     is_winner={self.manager.game.is_winner}
                     is_guessing={self.manager.game.is_guessing}
                     is_hidden={self.manager.game.is_hidden}
+                    is_emojis_copied={self.is_emojis_copied}
+                    is_link_copied={self.is_link_copied}
                     game_mode={self.manager.game.game_mode}
                     message={self.manager.game.message.clone()}
                     word={word}
