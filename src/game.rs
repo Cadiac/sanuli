@@ -669,7 +669,7 @@ impl Game {
         let share_str = window.btoa(&game_str).ok()?;
         let base_url = window.location().origin().ok()?;
 
-        Some(format!("{}/?game={}", base_url, share_str))
+        Some(format!("{}/?peli={}", base_url, share_str))
     }
 
     pub fn reveal_hidden_tiles(&mut self) -> bool {

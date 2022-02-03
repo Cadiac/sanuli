@@ -289,7 +289,7 @@ impl Manager {
             let key = parts.next()?;
             let value = parts.next()?;
 
-            if key == "game" && !value.is_empty() {
+            if key == "peli" && !value.is_empty() {
                 let game_str = window
                     .atob(value)
                     .ok()?;
