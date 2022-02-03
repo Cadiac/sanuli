@@ -26,8 +26,8 @@ pub struct Message {
 }
 
 pub enum Msg {
-    SetIsEmojisCopied(bool),
-    SetIsLinkCopied(bool),
+    SetIsEmojisCopied,
+    SetIsLinkCopied,
 }
 
 impl Component for Message {
@@ -43,30 +43,16 @@ impl Component for Message {
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::SetIsEmojisCopied(is_copied) => {
-                self.is_emojis_copied = is_copied;
+            Msg::SetIsEmojisCopied => {
+                self.is_emojis_copied = true;
                 self.is_link_copied = false;
             }
-            Msg::SetIsLinkCopied(is_copied) => {
-                self.is_link_copied = is_copied;
+            Msg::SetIsLinkCopied => {
+                self.is_link_copied = true;
                 self.is_emojis_copied = false;
             }
         }
         true
-    }
-
-    fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
-        if !first_render {
-            return;
-        }
-
-        if self.is_emojis_copied {
-            ctx.link().send_message(Msg::SetIsEmojisCopied(false));
-        }
-
-        if self.is_link_copied {
-            ctx.link().send_message(Msg::SetIsLinkCopied(false));
-        }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
@@ -81,7 +67,7 @@ impl Component for Message {
                         let reveal_hidden_tiles = ctx.link().callback(move |e: MouseEvent| {
                             e.prevent_default();
                             callback.emit(GameMsg::RevealHiddenTiles);
-                            Msg::SetIsEmojisCopied(true)
+                            Msg::SetIsEmojisCopied
                         });
                         let callback = props.callback.clone();
                         let reset_game = Callback::from(move |e: MouseEvent| {
@@ -128,13 +114,13 @@ impl Message {
         let share_emojis = ctx.link().callback(move |e: MouseEvent| {
             e.prevent_default();
             callback.emit(GameMsg::ShareEmojis);
-            Msg::SetIsEmojisCopied(true)
+            Msg::SetIsEmojisCopied
         });
         let callback = props.callback.clone();
         let share_link = ctx.link().callback(move |e: MouseEvent| {
             e.prevent_default();
             callback.emit(GameMsg::ShareLink);
-            Msg::SetIsLinkCopied(true)
+            Msg::SetIsLinkCopied
         });
 
         html! {
