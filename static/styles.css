@@ -187,7 +187,6 @@ header {
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    overflow: hidden;
     margin-left: 12px;
     margin-right: 6px;
     margin-bottom: 6px;
