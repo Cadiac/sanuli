@@ -196,7 +196,6 @@ impl Component for App {
                         if let Some(clipboard) = navigator.clipboard() {
                             let _promise = clipboard.write_text(link.as_str());
                         }
-                        log::info!("{}", link);
                     }
                 }
                 true
