@@ -18,7 +18,6 @@ const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
 const PROFANITIES: &str = include_str!("../profanities.txt");
 
-pub const EMPTY: char = '\u{00a0}'; // &nbsp;
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;

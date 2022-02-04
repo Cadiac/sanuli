@@ -4,6 +4,7 @@
     --correct: #6aaa64;
     --unknown: #818384;
     --background: #121212;
+    --background-transparent: #12121200;
     --text: #d7dadc;
     --white: #ffffff;
     --slide-offset-1: 68.5px;
@@ -131,6 +132,7 @@ header {
     margin-top: 0px;
     margin-bottom: 0px;
     text-shadow: 2px 2px 10px #000000;
+    background: linear-gradient(180deg, var(--background-transparent), var(--background));
     min-height: 39px;
     font-weight: 700;
     font-size: 14px;

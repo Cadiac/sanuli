@@ -14,7 +14,6 @@ use crate::manager::{
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
 const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
-pub const EMPTY: char = '\u{00a0}'; // &nbsp;
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
@@ -111,7 +110,7 @@ impl Game {
             is_unknown: false,
             is_reset: false,
             is_hidden: false,
-            message: EMPTY.to_string(),
+            message: String::new(),
             known_states,
             discovered_counts,
             guesses,
@@ -163,7 +162,7 @@ impl Game {
             is_unknown: false,
             is_reset: false,
             is_hidden: true,
-            message: EMPTY.to_string(),
+            message: String::new(),
             known_states,
             discovered_counts,
             guesses,
@@ -549,7 +548,7 @@ impl Game {
 
     fn clear_message(&mut self) {
         self.is_unknown = false;
-        self.message = EMPTY.to_string();
+        self.message = String::new();
     }
 
     fn set_game_end_message(&mut self) {

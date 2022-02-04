@@ -114,7 +114,7 @@ fn sub_message(props: &SubMessageProps) -> Html {
             <a class="link" href={"javascript:void(0)"} onclick={share_link}>
                 {
                     if !props.is_link_copied {
-                        {"Linkki"}
+                        {"Kopioi linkki"}
                     } else {
                         {"Kopioitu!"}
                     }
@@ -128,7 +128,7 @@ fn sub_message(props: &SubMessageProps) -> Html {
                             <a class="link" href={"javascript:void(0)"} onclick={share_emojis}>
                                 {
                                     if !props.is_emojis_copied {
-                                        {"Emojit"}
+                                        {"Kopioi tulos"}
                                     } else {
                                         {"Kopioitu!"}
                                     }

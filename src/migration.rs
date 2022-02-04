@@ -6,7 +6,7 @@ use chrono::{Local, NaiveDate};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-use crate::manager::{GameMode, Manager, Theme, TileState, WordList, DAILY_WORD_LEN, EMPTY};
+use crate::manager::{GameMode, Manager, Theme, TileState, WordList, DAILY_WORD_LEN};
 use crate::game::{Game};
 
 impl FromStr for GameMode {
@@ -116,7 +116,7 @@ pub fn migrate_settings_and_stats(manager: &mut Manager) -> Result<(), JsValue> 
                             if !new_daily_game.is_guessing {
                                 new_daily_game.message = "Uusi sanuli huomenna!".to_owned();
                             } else {
-                                new_daily_game.message = EMPTY.to_string()
+                                new_daily_game.message = String::new();
                             }
 
                             // Persist the game
