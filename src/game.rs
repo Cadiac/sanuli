@@ -252,7 +252,7 @@ impl Game {
             .collect()
     }
 
-    pub fn next_word(&mut self) -> bool {
+    pub fn next_word(&mut self) {
         let next_word = Game::get_word(
             self.game_mode,
             self.word_list,
@@ -320,8 +320,6 @@ impl Game {
         self.clear_message();
 
         let _result = self.persist();
-
-        true
     }
 
     pub fn keyboard_tilestate(&self, key: &char) -> TileState {
@@ -489,9 +487,9 @@ impl Game {
         self.reveal_row_tiles(self.current_guess);
     }
 
-    pub fn push_character(&mut self, character: char) -> bool {
+    pub fn push_character(&mut self, character: char) {
         if !self.is_guessing || self.guesses[self.current_guess].len() >= self.word_length {
-            return false;
+            return;
         }
 
         self.clear_message();
@@ -499,18 +497,15 @@ impl Game {
         let tile_state =
             self.current_guess_state(character, self.guesses[self.current_guess].len());
         self.guesses[self.current_guess].push((character, tile_state));
-        true
     }
 
-    pub fn pop_character(&mut self) -> bool {
+    pub fn pop_character(&mut self) {
         if !self.is_guessing || self.guesses[self.current_guess].is_empty() {
-            return false;
+            return;
         }
 
         self.clear_message();
         self.guesses[self.current_guess].pop();
-
-        true
     }
 
     fn is_guess_allowed(&self) -> bool {
@@ -669,13 +664,12 @@ impl Game {
         Some(format!("{}/?peli={}", base_url, safe_str))
     }
 
-    pub fn reveal_hidden_tiles(&mut self) -> bool {
+    pub fn reveal_hidden_tiles(&mut self) {
         self.is_hidden = false;
         self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
-        true
     }
 
-    pub fn reset(&mut self) -> bool {
+    pub fn reset(&mut self) {
         self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
             .take(self.max_guesses)
             .collect::<Vec<_>>();
@@ -698,8 +692,6 @@ impl Game {
             .collect::<Vec<_>>();
 
         self.previous_guesses = Vec::new();
-
-        true
     }
 
     fn recalculate(&mut self) {

@@ -308,13 +308,11 @@ impl Manager {
         return None;
     }
 
-    pub fn submit_guess(&mut self) -> bool {
+    pub fn submit_guess(&mut self) {
         self.game.submit_guess();
         if !self.game.is_guessing {
             self.update_game_statistics(self.game.is_winner, self.game.streak);
         }
-
-        true
     }
 
     pub fn change_word_length(&mut self, new_length: usize) {
@@ -398,13 +396,12 @@ impl Manager {
         let _result = self.persist();
     }
 
-    pub fn change_theme(&mut self, theme: Theme) -> bool {
+    pub fn change_theme(&mut self, theme: Theme) {
         self.theme = theme;
         let _result = self.persist();
-        true
     }
 
-    fn switch_active_game(&mut self) -> bool {
+    fn switch_active_game(&mut self) {
         let next_game = (
             self.current_game_mode,
             self.current_word_list,
@@ -421,7 +418,7 @@ impl Manager {
             && next_game.1 == previous_game.1
             && next_game.2 == previous_game.2
         {
-            return false;
+            return;
         }
 
         self.previous_game = previous_game;
@@ -457,8 +454,6 @@ impl Manager {
 
         self.background_games
             .insert(previous_game, mem::replace(&mut self.game, game));
-
-        true
     }
 
     fn update_game_statistics(&mut self, is_winner: bool, streak: usize) {
@@ -483,12 +478,12 @@ impl Manager {
         self.game.share_link()
     }
 
-    pub fn reveal_hidden_tiles(&mut self) -> bool {
-        self.game.reveal_hidden_tiles()
+    pub fn reveal_hidden_tiles(&mut self) {
+        self.game.reveal_hidden_tiles();
     }
 
-    pub fn reset_game(&mut self) -> bool {
-        self.game.reset()
+    pub fn reset_game(&mut self) {
+        self.game.reset();
     }
 
     fn persist(&self) -> Result<(), StorageError> {

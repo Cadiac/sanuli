@@ -129,59 +129,47 @@ impl Component for App {
                 } else {
                     link.send_message(Msg::Guess);
                 }
-
-                true
             }
             Msg::Guess => self.manager.submit_guess(),
             Msg::NextWord => {
                 self.manager.game.next_word();
                 self.is_emojis_copied = false;
                 self.is_link_copied = false;
-                true
             }
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
-                true
             }
             Msg::ToggleMenu => {
                 self.is_menu_visible = !self.is_menu_visible;
                 self.is_help_visible = false;
-                true
             }
             Msg::ChangeWordLength(new_length) => {
                 self.manager.change_word_length(new_length);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                true
             }
             Msg::ChangeGameMode(new_mode) => {
                 self.manager.change_game_mode(new_mode);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                true
             }
             Msg::ChangeWordList(new_list) => {
                 self.manager.change_word_list(new_list);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                true
             }
             Msg::ChangePreviousGameMode => {
                 self.manager.change_previous_game_mode();
                 self.is_emojis_copied = false;
                 self.is_link_copied = false;
-                true
             }
             Msg::ChangeAllowProfanities(is_allowed) => {
                 self.manager.change_allow_profanities(is_allowed);
                 self.is_menu_visible = false;
                 self.is_help_visible = false;
-                true
             }
-            Msg::ChangeTheme(theme) => {
-                self.manager.change_theme(theme)
-            }
+            Msg::ChangeTheme(theme) => self.manager.change_theme(theme),
             Msg::ShareEmojis => {
                 #[cfg(web_sys_unstable_apis)]
                 {
@@ -196,7 +184,6 @@ impl Component for App {
                 }
                 self.is_emojis_copied = true;
                 self.is_link_copied = false;
-                true
             }
             Msg::ShareLink => {
                 #[cfg(web_sys_unstable_apis)]
@@ -213,15 +200,12 @@ impl Component for App {
                 }
                 self.is_link_copied = true;
                 self.is_emojis_copied = false;
-                true
             },
-            Msg::RevealHiddenTiles => {
-                self.manager.reveal_hidden_tiles()
-            },
-            Msg::ResetGame => {
-                self.manager.reset_game()
-            },
-        }
+            Msg::RevealHiddenTiles => self.manager.reveal_hidden_tiles(),
+            Msg::ResetGame => self.manager.reset_game(),
+        };
+
+        true
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
