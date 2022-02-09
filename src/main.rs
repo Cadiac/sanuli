@@ -1,3 +1,5 @@
+extern crate wee_alloc;
+
 use chrono::Local;
 use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
@@ -17,6 +19,10 @@ use components::{
 };
 use manager::{GameMode, Manager, Theme, TileState, WordList};
 use game::{Game};
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',

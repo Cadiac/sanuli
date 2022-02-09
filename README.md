@@ -89,8 +89,24 @@ trunk serve --port=9090
 
 ## Release build
 
+Pass the rust flags for building clipboard features & strip your home library paths from the binary.
+
 ```
-$ RUSTFLAGS=--cfg=web_sys_unstable_apis trunk build --release
+RUSTFLAGS="--cfg=web_sys_unstable_apis --remap-path-prefix $HOME=~" trunk build --release
 ```
 
 and copy the produced `dist` directory to your target server.
+
+### Optimizing .wasm binary size
+
+The `.wasm` binary is quite large, as it includes the full word lists and bunch of code.
+`wasm-opt` from [binaryen](https://github.com/WebAssembly/binaryen/releases) tools can be to
+optimized to further reduce the size of the binary.
+
+```
+wasm-opt -Os -o output.wasm input.wasm
+```
+
+replacing the input and output files with your binary name, ie. `dist/index-fea16a946b74a1d4_bg.wasm`.
+
+Some automation for this should be made.
