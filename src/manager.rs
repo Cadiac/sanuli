@@ -7,11 +7,11 @@ use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-use crate::game::{Game, IGame};
+use crate::game::{Game, BaseGame};
 
 const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
@@ -166,18 +166,11 @@ pub struct Manager {
     pub total_solved: usize,
 
     #[serde(skip)]
-    pub game: Option<Box<dyn IGame>>,
+    pub game: Option<Box<dyn Game>>,
     #[serde(skip)]
-    pub background_games: HashMap<(GameMode, WordList, usize), Box<dyn IGame>>,
+    pub background_games: HashMap<(GameMode, WordList, usize), Box<dyn Game>>,
     #[serde(skip)]
     pub word_lists: Rc<WordLists>,
-}
-
-fn default_game<'de, D>(_deserializer: D) -> Result<Box<dyn IGame>, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    Ok(Box::new(Game::default()))
 }
 
 impl Default for Manager {
@@ -223,7 +216,7 @@ impl Manager {
                 }
             }
 
-            let game = Game::new_or_rehydrate(
+            let game = BaseGame::new_or_rehydrate(
                 manager.current_game_mode,
                 manager.current_word_list,
                 manager.current_word_length,
@@ -237,7 +230,7 @@ impl Manager {
             manager
         } else {
             // Otherwise either create everything from scratch or recover some data from legacy storage manager
-            let game = Game::new(
+            let game = BaseGame::new(
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
@@ -274,7 +267,7 @@ impl Manager {
         initial_manager
     }
 
-    fn rehydrate_shared_game(&self) -> Option<Game> {
+    fn rehydrate_shared_game(&self) -> Option<BaseGame> {
         let window: Window = window().expect("window not available");
         let qs = window.location().search().ok()?;
         if qs.is_empty() {
@@ -294,7 +287,7 @@ impl Manager {
 
                 let game_str = window.atob(&base64).ok()?;
 
-                let game = Game::from_shared_link(&game_str, self.word_lists.clone());
+                let game = BaseGame::from_shared_link(&game_str, self.word_lists.clone());
 
                 // Remove the query string
                 window
@@ -353,7 +346,7 @@ impl Manager {
 
         let _res = self.persist();
         if let Some(game) = self.game.as_mut() {
-            game.persist();
+            let _res = game.persist();
         }
     }
 
@@ -443,7 +436,7 @@ impl Manager {
 
         let previous = match mem::take(&mut self.game) {
             Some(game) => game,
-            None => Box::new(Game::default()) as Box<dyn IGame>,
+            None => Box::new(BaseGame::default()) as Box<dyn Game>,
         };
 
         let previous_game = (
@@ -463,7 +456,7 @@ impl Manager {
 
         // Restore a suspended game or create a new one
         let mut game = self.background_games.remove(&next_game).unwrap_or_else(|| {
-            Box::new(Game::new_or_rehydrate(
+            Box::new(BaseGame::new_or_rehydrate(
                 next_game.0,
                 next_game.1,
                 next_game.2,

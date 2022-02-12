@@ -1,6 +1,5 @@
 extern crate wee_alloc;
 
-use chrono::Local;
 use std::collections::HashMap;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
@@ -17,7 +16,6 @@ use components::{
     modal::{HelpModal, MenuModal},
 };
 use manager::{GameMode, Manager, Theme, TileState, WordList};
-use game::{Game};
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -224,14 +222,10 @@ impl Component for App {
                 .map(|key| (*key, game.keyboard_tilestate(key)))
                 .collect::<HashMap<char, TileState>>();
 
-            let word = game.word().iter().collect::<String>();
-
             let last_guess = game.guesses()[game.current_guess()]
                 .iter()
                 .map(|(c, _)| c)
                 .collect::<String>();
-
-            let today = Local::now().naive_local().date();
 
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
@@ -262,7 +256,7 @@ impl Component for App {
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
                         message={game.message()}
-                        word={word}
+                        word={game.word().iter().collect::<String>()}
                         last_guess={last_guess}
                         keyboard={keyboard_state}
                     />

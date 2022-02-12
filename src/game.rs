@@ -18,7 +18,7 @@ pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 
-pub trait IGame {
+pub trait Game {
     fn title(&self) -> String;
     fn next_word(&mut self);
     fn keyboard_tilestate(&self, key: &char) -> TileState;
@@ -56,7 +56,7 @@ pub trait IGame {
     fn previous_guesses(&self) -> &Vec<Vec<(char, TileState)>>;
 }
 
-impl PartialEq for dyn IGame {
+impl PartialEq for dyn Game {
     fn eq(&self, other: &Self) -> bool {
         self.title() == other.title()
             && self.game_mode() == other.game_mode()
@@ -78,7 +78,7 @@ impl PartialEq for dyn IGame {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct Game {
+pub struct BaseGame {
     pub game_mode: GameMode,
     pub word_list: WordList,
     pub word_length: usize,
@@ -111,9 +111,9 @@ pub struct Game {
     discovered_counts: Vec<HashMap<char, CharacterCount>>,
 }
 
-impl Default for Game {
+impl Default for BaseGame {
     fn default() -> Self {
-        Game::new(
+        BaseGame::new(
             GameMode::default(),
             WordList::default(),
             DEFAULT_WORD_LENGTH,
@@ -123,7 +123,7 @@ impl Default for Game {
     }
 }
 
-impl Game {
+impl BaseGame {
     pub fn new(
         game_mode: GameMode,
         word_list: WordList,
@@ -149,7 +149,7 @@ impl Game {
             // Default initialization runs into this
             vec!['X'; word_length]
         } else {
-            Game::get_word(
+            Self::get_word(
                 game_mode,
                 word_list,
                 word_length,
@@ -244,7 +244,7 @@ impl Game {
         allow_profanities: bool,
         word_lists: Rc<WordLists>,
     ) -> Self {
-        if let Ok(game) = Game::rehydrate(
+        if let Ok(game) = Self::rehydrate(
             game_mode,
             word_list,
             word_length,
@@ -253,7 +253,7 @@ impl Game {
         ) {
             game
         } else {
-            Game::new(
+            Self::new(
                 game_mode,
                 word_list,
                 word_length,
@@ -271,9 +271,9 @@ impl Game {
         word_lists: &Rc<WordLists>,
     ) -> Vec<char> {
         if let GameMode::DailyWord(date) = game_mode {
-            Game::get_daily_word(date)
+            Self::get_daily_word(date)
         } else {
-            Game::get_random_word(word_list, word_length, allow_profanities, word_lists)
+            Self::get_random_word(word_list, word_length, allow_profanities, word_lists)
         }
     }
 
@@ -307,7 +307,7 @@ impl Game {
     fn get_daily_word(date: NaiveDate) -> Vec<char> {
         DAILY_WORDS
             .lines()
-            .nth(Game::get_daily_word_index(date))
+            .nth(Self::get_daily_word_index(date))
             .unwrap()
             .chars()
             .collect()
@@ -515,7 +515,7 @@ impl Game {
         word_length: usize,
         allow_profanities: bool,
         word_lists: Rc<WordLists>,
-    ) -> Result<Game, StorageError> {
+    ) -> Result<Self, StorageError> {
         let game_key = &format!(
             "game|{}|{}|{}",
             serde_json::to_string(&game_mode).unwrap(),
@@ -523,7 +523,7 @@ impl Game {
             word_length
         );
 
-        let mut game: Game = LocalStorage::get(game_key)?;
+        let mut game: Self = LocalStorage::get(game_key)?;
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
 
@@ -533,7 +533,7 @@ impl Game {
     }
 }
 
-impl IGame for Game {
+impl Game for BaseGame {
     fn game_mode(&self) -> &GameMode {
         &self.game_mode
     }
@@ -586,7 +586,7 @@ impl IGame for Game {
 
     fn title(&self) -> String {
         if let GameMode::DailyWord(date) = self.game_mode {
-            format!("Päivän sanuli #{}", Game::get_daily_word_index(date) + 1)
+            format!("Päivän sanuli #{}", Self::get_daily_word_index(date) + 1)
         } else if self.game_mode == GameMode::Shared {
             "Jaettu sanuli".to_owned()
         } else if self.streak > 0 {
@@ -597,7 +597,7 @@ impl IGame for Game {
     }
 
     fn next_word(&mut self) {
-        let next_word = Game::get_word(
+        let next_word = Self::get_word(
             self.game_mode,
             self.word_list,
             self.word_length,
@@ -773,7 +773,7 @@ impl IGame for Game {
         let mut message = String::new();
 
         if let GameMode::DailyWord(date) = self.game_mode {
-            let index = Game::get_daily_word_index(date) + 1;
+            let index = Self::get_daily_word_index(date) + 1;
             let guess_count = if self.is_winner {
                 format!("{}", self.current_guess + 1)
             } else {
