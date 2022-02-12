@@ -7,12 +7,11 @@ use std::str::FromStr;
 
 use chrono::{Local, NaiveDate};
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
+use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
-use wasm_bindgen::{JsValue};
 
-use crate::migration;
-use crate::game::{Game};
+use crate::game::{Game, IGame};
 
 const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
@@ -150,7 +149,7 @@ pub enum CharacterCount {
     Exactly(usize),
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(PartialEq, Serialize, Deserialize)]
 pub struct Manager {
     pub allow_profanities: bool,
     pub current_game_mode: GameMode,
@@ -167,11 +166,18 @@ pub struct Manager {
     pub total_solved: usize,
 
     #[serde(skip)]
-    pub game: Game,
+    pub game: Option<Box<dyn IGame>>,
     #[serde(skip)]
-    pub background_games: HashMap<(GameMode, WordList, usize), Game>,
+    pub background_games: HashMap<(GameMode, WordList, usize), Box<dyn IGame>>,
     #[serde(skip)]
     pub word_lists: Rc<WordLists>,
+}
+
+fn default_game<'de, D>(_deserializer: D) -> Result<Box<dyn IGame>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    Ok(Box::new(Game::default()))
 }
 
 impl Default for Manager {
@@ -195,7 +201,7 @@ impl Default for Manager {
             total_played: 0,
             total_solved: 0,
 
-            game: Game::default(),
+            game: None,
             background_games: HashMap::new(),
             word_lists: Rc::new(HashMap::new()),
         }
@@ -225,7 +231,7 @@ impl Manager {
                 word_lists.clone(),
             );
 
-            manager.game = game;
+            manager.game = Some(Box::new(game));
             manager.word_lists = word_lists;
 
             manager
@@ -239,23 +245,14 @@ impl Manager {
                 word_lists.clone(),
             );
 
-            let mut manager = Self {
-                game,
+            let manager = Self {
+                game: Some(Box::new(game)),
                 word_lists,
                 ..Self::default()
             };
 
-            // Try to migrate old settings and stats from localStorage to current format
-            // TODO: Get rid of this at some point, noop if already migrated or there's no data
-            let _res = migration::migrate_settings_and_stats(&mut manager);
-            manager.switch_active_game();
-
-            // Try to migrate old game streak from localStorage to current format, if the game mode is not daily
-            // TODO: Get rid of this at some point, noop if already migrated or there's no data
-            let _res = migration::migrate_game(&mut manager.game);
-
             let _res = manager.persist();
-            let _res = manager.game.persist();
+            let _res = manager.game.as_ref().unwrap().persist();
 
             manager
         };
@@ -266,7 +263,10 @@ impl Manager {
             initial_manager.current_word_length = game.word_length;
             initial_manager.current_word_list = game.word_list;
 
-            initial_manager.background_games.insert((game.game_mode, game.word_list, game.word_length), game);
+            initial_manager.background_games.insert(
+                (game.game_mode, game.word_list, game.word_length),
+                Box::new(game),
+            );
 
             initial_manager.switch_active_game();
         }
@@ -292,14 +292,16 @@ impl Manager {
                 // Replace URL safe characters back to +/=
                 let base64 = value.replace("-", "+").replace(".", "/").replace("_", "=");
 
-                let game_str = window
-                    .atob(&base64)
-                    .ok()?;
+                let game_str = window.atob(&base64).ok()?;
 
                 let game = Game::from_shared_link(&game_str, self.word_lists.clone());
 
                 // Remove the query string
-                window.history().ok()?.replace_state_with_url(&JsValue::null(), "", Some("/")).ok()?;
+                window
+                    .history()
+                    .ok()?
+                    .replace_state_with_url(&JsValue::null(), "", Some("/"))
+                    .ok()?;
 
                 return game;
             }
@@ -308,10 +310,36 @@ impl Manager {
         return None;
     }
 
+    pub fn push_character(&mut self, character: char) {
+        if let Some(game) = self.game.as_mut() {
+            game.push_character(character);
+        }
+    }
+
+    pub fn pop_character(&mut self) {
+        if let Some(game) = self.game.as_mut() {
+            game.pop_character();
+        }
+    }
+
+    pub fn next_word(&mut self) {
+        if let Some(game) = self.game.as_mut() {
+            game.next_word();
+        }
+    }
+
     pub fn submit_guess(&mut self) {
-        self.game.submit_guess();
-        if !self.game.is_guessing {
-            self.update_game_statistics(self.game.is_winner, self.game.streak);
+        if self.game.is_none() {
+            return;
+        }
+
+        self.game.as_mut().unwrap().submit_guess();
+
+        if !self.game.as_ref().unwrap().is_guessing() {
+            self.update_game_statistics(
+                self.game.as_ref().unwrap().is_winner(),
+                self.game.as_ref().unwrap().streak(),
+            );
         }
     }
 
@@ -324,7 +352,9 @@ impl Manager {
         self.switch_active_game();
 
         let _res = self.persist();
-        let _res = self.game.persist();
+        if let Some(game) = self.game.as_mut() {
+            game.persist();
+        }
     }
 
     pub fn change_game_mode(&mut self, new_mode: GameMode) {
@@ -350,7 +380,7 @@ impl Manager {
         self.current_game_mode = new_mode;
         self.switch_active_game();
         let _res = self.persist();
-        let _res = self.game.persist();
+        let _res = self.game.as_ref().unwrap().persist();
     }
 
     pub fn change_word_list(&mut self, new_list: WordList) {
@@ -362,7 +392,7 @@ impl Manager {
         self.switch_active_game();
 
         let _res = self.persist();
-        let _res = self.game.persist();
+        let _res = self.game.as_ref().unwrap().persist();
     }
 
     pub fn change_previous_game_mode(&mut self) {
@@ -384,14 +414,17 @@ impl Manager {
         self.switch_active_game();
 
         let _res = self.persist();
-        let _res = self.game.persist();
+        let _res = self.game.as_mut().unwrap().persist();
     }
 
     pub fn change_allow_profanities(&mut self, is_allowed: bool) {
         self.allow_profanities = is_allowed;
-        self.game.allow_profanities = self.allow_profanities;
+        self.game
+            .as_mut()
+            .unwrap()
+            .set_allow_profanities(self.allow_profanities);
         self.background_games.values_mut().for_each(|game| {
-            game.allow_profanities = self.allow_profanities;
+            game.set_allow_profanities(self.allow_profanities);
         });
         let _result = self.persist();
     }
@@ -408,10 +441,15 @@ impl Manager {
             self.current_word_length,
         );
 
+        let previous = match mem::take(&mut self.game) {
+            Some(game) => game,
+            None => Box::new(Game::default()) as Box<dyn IGame>,
+        };
+
         let previous_game = (
-            self.game.game_mode,
-            self.game.word_list,
-            self.game.word_length,
+            *previous.game_mode(),
+            *previous.word_list(),
+            previous.word_length(),
         );
 
         if next_game.0 == previous_game.0
@@ -425,35 +463,21 @@ impl Manager {
 
         // Restore a suspended game or create a new one
         let mut game = self.background_games.remove(&next_game).unwrap_or_else(|| {
-            Game::new_or_rehydrate(
+            Box::new(Game::new_or_rehydrate(
                 next_game.0,
                 next_game.1,
                 next_game.2,
                 self.allow_profanities,
                 self.word_lists.clone(),
-            )
+            ))
         });
 
-        // For playing the animation populate previous_guesses
-        if previous_game.2 <= next_game.2 {
-            game.previous_guesses = self.game.guesses.clone();
-        } else {
-            game.previous_guesses = self
-                .game
-                .guesses
-                .iter()
-                .cloned()
-                .map(|guess| guess.into_iter().take(game.word_length).collect())
-                .collect();
-        }
+        // Prepare the previous game slide out animation
+        game.prepare_previous_guesses_animation(previous_game.2);
 
-        if self.game.current_guess < game.max_guesses - 1 {
-            game.previous_guesses.truncate(self.game.current_guess);
+        if let Some(suspended) = mem::replace(&mut self.game, Some(game)) {
+            self.background_games.insert(previous_game, suspended);
         }
-        game.is_reset = true;
-
-        self.background_games
-            .insert(previous_game, mem::replace(&mut self.game, game));
     }
 
     fn update_game_statistics(&mut self, is_winner: bool, streak: usize) {
@@ -470,21 +494,25 @@ impl Manager {
     }
 
     #[cfg(web_sys_unstable_apis)]
-    pub fn share_emojis(&self) -> String {
-        self.game.share_emojis(self.theme)
+    pub fn share_emojis(&self) -> Option<String> {
+        self.game.as_ref()?.share_emojis(self.theme)
     }
 
     #[cfg(web_sys_unstable_apis)]
     pub fn share_link(&self) -> Option<String> {
-        self.game.share_link()
+        self.game.as_ref()?.share_link()
     }
 
     pub fn reveal_hidden_tiles(&mut self) {
-        self.game.reveal_hidden_tiles();
+        if let Some(game) = self.game.as_mut() {
+            game.reveal_hidden_tiles();
+        }
     }
 
     pub fn reset_game(&mut self) {
-        self.game.reset();
+        if let Some(game) = self.game.as_mut() {
+            game.reset();
+        }
     }
 
     fn persist(&self) -> Result<(), StorageError> {
@@ -502,4 +530,3 @@ impl Manager {
         Ok(manager)
     }
 }
-

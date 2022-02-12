@@ -18,6 +18,65 @@ pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 
+pub trait IGame {
+    fn title(&self) -> String;
+    fn next_word(&mut self);
+    fn keyboard_tilestate(&self, key: &char) -> TileState;
+    fn submit_guess(&mut self);
+    fn push_character(&mut self, character: char);
+    fn pop_character(&mut self);
+    fn share_emojis(&self, theme: Theme) -> Option<String>;
+    fn share_link(&self) -> Option<String>;
+    fn reveal_hidden_tiles(&mut self);
+    fn reset(&mut self);
+    fn refresh(&mut self);
+    fn persist(&self) -> Result<(), StorageError>;
+    fn set_allow_profanities(&mut self, is_allowed: bool);
+
+    fn prepare_previous_guesses_animation(&mut self, previous_length: usize);
+
+    fn game_mode(&self) -> &GameMode;
+    fn word_list(&self) -> &WordList;
+    fn word_length(&self) -> usize;
+    fn max_guesses(&self) -> usize;
+
+    fn word(&self) -> &Vec<char>;
+    fn guesses(&self) -> &Vec<Vec<(char, TileState)>>;
+    fn current_guess(&self) -> usize;
+    fn streak(&self) -> usize;
+
+    fn is_guessing(&self) -> bool;
+    fn is_winner(&self) -> bool;
+    fn is_unknown(&self) -> bool;
+    fn is_reset(&self) -> bool;
+    fn is_hidden(&self) -> bool;
+
+    fn message(&self) -> String;
+
+    fn previous_guesses(&self) -> &Vec<Vec<(char, TileState)>>;
+}
+
+impl PartialEq for dyn IGame {
+    fn eq(&self, other: &Self) -> bool {
+        self.title() == other.title()
+            && self.game_mode() == other.game_mode()
+            && self.word_list() == other.word_list()
+            && self.word_length() == other.word_length()
+            && self.max_guesses() == other.max_guesses()
+            && self.word() == other.word()
+            && self.guesses() == other.guesses()
+            && self.current_guess() == other.current_guess()
+            && self.streak() == other.streak()
+            && self.is_guessing() == other.is_guessing()
+            && self.is_winner() == other.is_winner()
+            && self.is_unknown() == other.is_unknown()
+            && self.is_reset() == other.is_reset()
+            && self.is_hidden() == other.is_hidden()
+            && self.message() == other.message()
+            && self.previous_guesses() == other.previous_guesses()
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Game {
     pub game_mode: GameMode,
@@ -34,20 +93,22 @@ pub struct Game {
     pub is_winner: bool,
     pub is_unknown: bool,
     pub is_reset: bool,
+    #[serde(skip)]
+    pub is_hidden: bool,
+
     pub message: String,
 
     #[serde(skip)]
-    pub is_hidden: bool,
-    #[serde(skip)]
-    pub allow_profanities: bool,
-    #[serde(skip)]
-    pub word_lists: Rc<WordLists>,
-    #[serde(skip)]
-    pub known_states: Vec<HashMap<(char, usize), CharacterState>>,
-    #[serde(skip)]
-    pub discovered_counts: Vec<HashMap<char, CharacterCount>>,
-    #[serde(skip)]
     pub previous_guesses: Vec<Vec<(char, TileState)>>,
+
+    #[serde(skip)]
+    allow_profanities: bool,
+    #[serde(skip)]
+    word_lists: Rc<WordLists>,
+    #[serde(skip)]
+    known_states: Vec<HashMap<(char, usize), CharacterState>>,
+    #[serde(skip)]
+    discovered_counts: Vec<HashMap<char, CharacterCount>>,
 }
 
 impl Default for Game {
@@ -171,7 +232,7 @@ impl Game {
             streak: 0,
         };
 
-        game.recalculate();
+        game.refresh();
 
         return Some(game);
     }
@@ -238,7 +299,7 @@ impl Game {
         (*chosen).clone()
     }
 
-    pub fn get_daily_word_index(date: NaiveDate) -> usize {
+    fn get_daily_word_index(date: NaiveDate) -> usize {
         let epoch = NaiveDate::from_ymd(2022, 1, 7); // Epoch of the daily word mode, index 0
         date.signed_duration_since(epoch).num_days() as usize
     }
@@ -250,101 +311,6 @@ impl Game {
             .unwrap()
             .chars()
             .collect()
-    }
-
-    pub fn next_word(&mut self) {
-        let next_word = Game::get_word(
-            self.game_mode,
-            self.word_list,
-            self.word_length,
-            self.allow_profanities,
-            &self.word_lists,
-        );
-
-        let previous_word = mem::replace(&mut self.word, next_word);
-
-        if previous_word.len() <= self.word_length {
-            self.previous_guesses = mem::take(&mut self.guesses);
-            if self.game_mode == GameMode::Relay && self.is_winner {
-                self.previous_guesses.truncate(self.current_guess);
-            } else {
-                self.previous_guesses.truncate(self.current_guess + 1);
-            }
-        } else {
-            let previous_guesses = mem::take(&mut self.guesses);
-            self.previous_guesses = previous_guesses
-                .into_iter()
-                .map(|guess| guess.into_iter().take(self.word_length).collect())
-                .collect();
-            self.previous_guesses.truncate(self.current_guess);
-        }
-
-        self.guesses = Vec::with_capacity(self.max_guesses);
-
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-        self.discovered_counts = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
-            .collect::<Vec<_>>();
-
-        if previous_word.len() == self.word_length
-            && self.is_winner
-            && self.game_mode == GameMode::Relay
-        {
-            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses - 1)
-                .collect::<Vec<_>>();
-
-            self.guesses.push(
-                previous_word
-                    .iter()
-                    .map(|c| (*c, TileState::Unknown))
-                    .collect(),
-            );
-            self.guesses.extend(empty_guesses);
-
-            self.current_guess = 0;
-            self.calculate_current_guess();
-            self.current_guess = 1;
-        } else {
-            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses)
-                .collect::<Vec<_>>();
-            self.current_guess = 0;
-        }
-
-        self.is_guessing = true;
-        self.is_winner = false;
-        self.is_reset = true;
-        self.clear_message();
-
-        let _result = self.persist();
-    }
-
-    pub fn keyboard_tilestate(&self, key: &char) -> TileState {
-        let is_correct = self.known_states[self.current_guess]
-            .iter()
-            .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
-        if is_correct {
-            return TileState::Correct;
-        }
-
-        match self.discovered_counts[self.current_guess].get(key) {
-            Some(CharacterCount::AtLeast(count)) => {
-                if *count == 0 {
-                    return TileState::Unknown;
-                }
-                TileState::Present
-            }
-            Some(CharacterCount::Exactly(count)) => {
-                if *count == 0 {
-                    return TileState::Absent;
-                }
-                TileState::Present
-            }
-            None => TileState::Unknown,
-        }
     }
 
     fn current_guess_state(&mut self, character: char, index: usize) -> TileState {
@@ -429,7 +395,7 @@ impl Game {
         }
     }
 
-    pub fn calculate_current_guess(&mut self) {
+    fn calculate_current_guess(&mut self) {
         for (index, (character, _)) in self.guesses[self.current_guess].iter().enumerate() {
             let known = self.known_states[self.current_guess]
                 .entry((*character, index))
@@ -485,27 +451,6 @@ impl Game {
         }
 
         self.reveal_row_tiles(self.current_guess);
-    }
-
-    pub fn push_character(&mut self, character: char) {
-        if !self.is_guessing || self.guesses[self.current_guess].len() >= self.word_length {
-            return;
-        }
-
-        self.clear_message();
-
-        let tile_state =
-            self.current_guess_state(character, self.guesses[self.current_guess].len());
-        self.guesses[self.current_guess].push((character, tile_state));
-    }
-
-    pub fn pop_character(&mut self) {
-        if !self.is_guessing || self.guesses[self.current_guess].is_empty() {
-            return;
-        }
-
-        self.clear_message();
-        self.guesses[self.current_guess].pop();
     }
 
     fn is_guess_allowed(&self) -> bool {
@@ -564,7 +509,209 @@ impl Game {
         }
     }
 
-    pub fn submit_guess(&mut self) {
+    fn rehydrate(
+        game_mode: GameMode,
+        word_list: WordList,
+        word_length: usize,
+        allow_profanities: bool,
+        word_lists: Rc<WordLists>,
+    ) -> Result<Game, StorageError> {
+        let game_key = &format!(
+            "game|{}|{}|{}",
+            serde_json::to_string(&game_mode).unwrap(),
+            serde_json::to_string(&word_list).unwrap(),
+            word_length
+        );
+
+        let mut game: Game = LocalStorage::get(game_key)?;
+        game.allow_profanities = allow_profanities;
+        game.word_lists = word_lists;
+
+        game.refresh();
+
+        Ok(game)
+    }
+}
+
+impl IGame for Game {
+    fn game_mode(&self) -> &GameMode {
+        &self.game_mode
+    }
+    fn word_list(&self) -> &WordList {
+        &self.word_list
+    }
+    fn word_length(&self) -> usize {
+        self.word_length
+    }
+    fn max_guesses(&self) -> usize {
+        self.max_guesses
+    }
+    fn word(&self) -> &Vec<char> {
+        &self.word
+    }
+    fn guesses(&self) -> &Vec<Vec<(char, TileState)>> {
+        &self.guesses
+    }
+    fn current_guess(&self) -> usize {
+        self.current_guess
+    }
+    fn streak(&self) -> usize {
+        self.streak
+    }
+    fn is_guessing(&self) -> bool {
+        self.is_guessing
+    }
+    fn is_winner(&self) -> bool {
+        self.is_winner
+    }
+    fn is_unknown(&self) -> bool {
+        self.is_unknown
+    }
+    fn is_reset(&self) -> bool {
+        self.is_reset
+    }
+    fn is_hidden(&self) -> bool {
+        self.is_hidden
+    }
+    fn message(&self) -> String {
+        self.message.clone()
+    }
+    fn previous_guesses(&self) -> &Vec<Vec<(char, TileState)>> {
+        &self.previous_guesses
+    }
+
+    fn set_allow_profanities(&mut self, is_allowed: bool) {
+        self.allow_profanities = is_allowed;
+    }
+
+    fn title(&self) -> String {
+        if let GameMode::DailyWord(date) = self.game_mode {
+            format!("Päivän sanuli #{}", Game::get_daily_word_index(date) + 1)
+        } else if self.game_mode == GameMode::Shared {
+            "Jaettu sanuli".to_owned()
+        } else if self.streak > 0 {
+            "Sanuli — Putki: {}".to_owned()
+        } else {
+            "Sanuli".to_owned()
+        }
+    }
+
+    fn next_word(&mut self) {
+        let next_word = Game::get_word(
+            self.game_mode,
+            self.word_list,
+            self.word_length,
+            self.allow_profanities,
+            &self.word_lists,
+        );
+
+        let previous_word = mem::replace(&mut self.word, next_word);
+
+        if previous_word.len() <= self.word_length {
+            self.previous_guesses = mem::take(&mut self.guesses);
+            if self.game_mode == GameMode::Relay && self.is_winner {
+                self.previous_guesses.truncate(self.current_guess);
+            } else {
+                self.previous_guesses.truncate(self.current_guess + 1);
+            }
+        } else {
+            let previous_guesses = mem::take(&mut self.guesses);
+            self.previous_guesses = previous_guesses
+                .into_iter()
+                .map(|guess| guess.into_iter().take(self.word_length).collect())
+                .collect();
+            self.previous_guesses.truncate(self.current_guess);
+        }
+
+        self.guesses = Vec::with_capacity(self.max_guesses);
+
+        self.known_states = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+        self.discovered_counts = std::iter::repeat(HashMap::new())
+            .take(DEFAULT_MAX_GUESSES)
+            .collect::<Vec<_>>();
+
+        if previous_word.len() == self.word_length
+            && self.is_winner
+            && self.game_mode == GameMode::Relay
+        {
+            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses - 1)
+                .collect::<Vec<_>>();
+
+            self.guesses.push(
+                previous_word
+                    .iter()
+                    .map(|c| (*c, TileState::Unknown))
+                    .collect(),
+            );
+            self.guesses.extend(empty_guesses);
+
+            self.current_guess = 0;
+            self.calculate_current_guess();
+            self.current_guess = 1;
+        } else {
+            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
+                .take(self.max_guesses)
+                .collect::<Vec<_>>();
+            self.current_guess = 0;
+        }
+
+        self.is_guessing = true;
+        self.is_winner = false;
+        self.is_reset = true;
+        self.clear_message();
+
+        let _result = self.persist();
+    }
+
+    fn prepare_previous_guesses_animation(&mut self, previous_length: usize) {
+        // For playing the animation populate previous_guesses.
+        // This renders the previous game that slides and fades out.
+        if previous_length <= self.word_length {
+            self.previous_guesses = self.guesses.clone();
+        } else {
+            self.previous_guesses = self
+                .guesses
+                .iter()
+                .cloned()
+                .map(|guess| guess.into_iter().take(self.word_length).collect())
+                .collect();
+        }
+
+        if self.current_guess < self.max_guesses - 1 {
+            self.previous_guesses.truncate(self.current_guess);
+        }
+        self.is_reset = true;
+    }
+
+    fn keyboard_tilestate(&self, key: &char) -> TileState {
+        let is_correct = self.known_states[self.current_guess]
+            .iter()
+            .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
+        if is_correct {
+            return TileState::Correct;
+        }
+
+        match self.discovered_counts[self.current_guess].get(key) {
+            Some(CharacterCount::AtLeast(count)) => {
+                if *count == 0 {
+                    return TileState::Unknown;
+                }
+                TileState::Present
+            }
+            Some(CharacterCount::Exactly(count)) => {
+                if *count == 0 {
+                    return TileState::Absent;
+                }
+                TileState::Present
+            }
+            None => TileState::Unknown,
+        }
+    }
+
+    fn submit_guess(&mut self) {
         if !self.is_guess_allowed() {
             self.message = "Liian vähän kirjaimia!".to_owned();
             return;
@@ -601,8 +748,28 @@ impl Game {
         let _result = self.persist();
     }
 
-    #[cfg(web_sys_unstable_apis)]
-    pub fn share_emojis(&self, theme: Theme) -> String {
+    fn push_character(&mut self, character: char) {
+        if !self.is_guessing || self.guesses[self.current_guess].len() >= self.word_length {
+            return;
+        }
+
+        self.clear_message();
+
+        let tile_state =
+            self.current_guess_state(character, self.guesses[self.current_guess].len());
+        self.guesses[self.current_guess].push((character, tile_state));
+    }
+
+    fn pop_character(&mut self) {
+        if !self.is_guessing || self.guesses[self.current_guess].is_empty() {
+            return;
+        }
+
+        self.clear_message();
+        self.guesses[self.current_guess].pop();
+    }
+
+    fn share_emojis(&self, theme: Theme) -> Option<String> {
         let mut message = String::new();
 
         if let GameMode::DailyWord(date) = self.game_mode {
@@ -641,11 +808,10 @@ impl Game {
             }
         }
 
-        message
+        Some(message)
     }
 
-    #[cfg(web_sys_unstable_apis)]
-    pub fn share_link(&self) -> Option<String> {
+    fn share_link(&self) -> Option<String> {
         let game_str = format!(
             "{}|{}",
             self.word.iter().collect::<String>(),
@@ -656,20 +822,24 @@ impl Game {
         );
         let window: Window = window().expect("window not available");
         let share_str = window.btoa(&game_str).ok()?;
+
         let base_url = window.location().origin().ok()?;
 
         // Replace +/= at the base64 with URL safe characters
-        let safe_str = share_str.replace("+", "-").replace("/", ".").replace("=", "_");
+        let safe_str = share_str
+            .replace("+", "-")
+            .replace("/", ".")
+            .replace("=", "_");
 
-        Some(format!("{}/?peli={}", base_url, safe_str))
+        return Some(format!("{}/?peli={}", base_url, safe_str));
     }
 
-    pub fn reveal_hidden_tiles(&mut self) {
+    fn reveal_hidden_tiles(&mut self) {
         self.is_hidden = false;
         self.message = format!("Sana oli \"{}\"", self.word.iter().collect::<String>());
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
             .take(self.max_guesses)
             .collect::<Vec<_>>();
@@ -694,7 +864,7 @@ impl Game {
         self.previous_guesses = Vec::new();
     }
 
-    fn recalculate(&mut self) {
+    fn refresh(&mut self) {
         self.known_states = std::iter::repeat(HashMap::new())
             .take(self.max_guesses)
             .collect::<Vec<_>>();
@@ -719,7 +889,7 @@ impl Game {
         }
     }
 
-    pub fn persist(&self) -> Result<(), StorageError> {
+    fn persist(&self) -> Result<(), StorageError> {
         if self.game_mode == GameMode::Shared {
             // Never persist shared games
             return Ok(());
@@ -733,28 +903,5 @@ impl Game {
         );
 
         LocalStorage::set(game_key, self)
-    }
-
-    fn rehydrate(
-        game_mode: GameMode,
-        word_list: WordList,
-        word_length: usize,
-        allow_profanities: bool,
-        word_lists: Rc<WordLists>,
-    ) -> Result<Game, StorageError> {
-        let game_key = &format!(
-            "game|{}|{}|{}",
-            serde_json::to_string(&game_mode).unwrap(),
-            serde_json::to_string(&word_list).unwrap(),
-            word_length
-        );
-
-        let mut game: Game = LocalStorage::get(game_key)?;
-        game.allow_profanities = allow_profanities;
-        game.word_lists = word_lists;
-
-        game.recalculate();
-
-        Ok(game)
     }
 }

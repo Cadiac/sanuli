@@ -7,7 +7,6 @@ use web_sys::{window, Window};
 use yew::prelude::*;
 
 mod components;
-mod migration;
 mod manager;
 mod game;
 
@@ -121,24 +120,26 @@ impl Component for App {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Msg::KeyPress(c) => self.manager.game.push_character(c),
-            Msg::Backspace => self.manager.game.pop_character(),
+            Msg::KeyPress(c) => self.manager.push_character(c),
+            Msg::Backspace => self.manager.pop_character(),
             Msg::Enter => {
                 let link = ctx.link();
 
-                if !self.manager.game.is_guessing {
-                    if matches!(self.manager.game.game_mode, GameMode::DailyWord(_) | GameMode::Shared) {
-                        link.send_message(Msg::ChangePreviousGameMode);
+                if let Some(game) = &self.manager.game {
+                    if !game.is_guessing() {
+                        if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
+                            link.send_message(Msg::ChangePreviousGameMode);
+                        } else {
+                            link.send_message(Msg::NextWord);
+                        }
                     } else {
-                        link.send_message(Msg::NextWord);
+                        link.send_message(Msg::Guess);
                     }
-                } else {
-                    link.send_message(Msg::Guess);
                 }
             }
             Msg::Guess => self.manager.submit_guess(),
             Msg::NextWord => {
-                self.manager.game.next_word();
+                self.manager.next_word();
                 self.is_emojis_copied = false;
                 self.is_link_copied = false;
             }
@@ -181,11 +182,12 @@ impl Component for App {
                 {
                     use web_sys::Navigator;
 
-                    let emojis = self.manager.share_emojis();
-                    let window: Window = window().expect("window not available");
-                    let navigator: Navigator = window.navigator();
-                    if let Some(clipboard) = navigator.clipboard() {
-                        let _promise = clipboard.write_text(emojis.as_str());
+                    if let Some(emojis) = self.manager.share_emojis() {
+                        let window: Window = window().expect("window not available");
+                        let navigator: Navigator = window.navigator();
+                        if let Some(clipboard) = navigator.clipboard() {
+                            let _promise = clipboard.write_text(emojis.as_str());
+                        }
                     }
                 }
                 self.is_emojis_copied = true;
@@ -216,86 +218,101 @@ impl Component for App {
 
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
+        if let Some(game) = &self.manager.game {
+            let keyboard_state = ALLOWED_KEYS
+                .iter()
+                .map(|key| (*key, game.keyboard_tilestate(key)))
+                .collect::<HashMap<char, TileState>>();
 
-        let keyboard_state = ALLOWED_KEYS
-            .iter()
-            .map(|key| (*key, self.manager.game.keyboard_tilestate(key)))
-            .collect::<HashMap<char, TileState>>();
+            let word = game.word().iter().collect::<String>();
 
-        let word = self.manager.game.word.iter().collect::<String>();
+            let last_guess = game.guesses()[game.current_guess()]
+                .iter()
+                .map(|(c, _)| c)
+                .collect::<String>();
 
-        let last_guess = self.manager.game.guesses[self.manager.game.current_guess]
-            .iter()
-            .map(|(c, _)| c)
-            .collect::<String>();
+            let today = Local::now().naive_local().date();
 
-        let today = Local::now().naive_local().date();
+            html! {
+                <div class={classes!("game", self.manager.theme.to_string())}>
+                    <Header
+                        on_toggle_help_cb={link.callback(|_| Msg::ToggleHelp)}
+                        on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
+                        title={game.title()}
+                    />
 
-        html! {
-            <div class={classes!("game", self.manager.theme.to_string())}>
-                <Header
-                    on_toggle_help_cb={link.callback(|_| Msg::ToggleHelp)}
-                    on_toggle_menu_cb={link.callback(|_| Msg::ToggleMenu)}
-                    streak={self.manager.game.streak}
-                    game_mode={self.manager.game.game_mode}
-                    daily_word_number={Game::get_daily_word_index(today) + 1}
-                />
+                    <Board
+                        is_guessing={game.is_guessing()}
+                        is_reset={game.is_reset()}
+                        is_hidden={game.is_hidden()}
+                        guesses={game.guesses().clone()}
+                        previous_guesses={game.previous_guesses().clone()}
+                        current_guess={game.current_guess()}
+                        max_guesses={game.max_guesses()}
+                        word_length={game.word_length()}
+                    />
 
-                <Board
-                    is_guessing={self.manager.game.is_guessing}
-                    is_reset={self.manager.game.is_reset}
-                    is_hidden={self.manager.game.is_hidden}
-                    guesses={self.manager.game.guesses.clone()}
-                    previous_guesses={self.manager.game.previous_guesses.clone()}
-                    current_guess={self.manager.game.current_guess}
-                    max_guesses={self.manager.game.max_guesses}
-                    word_length={self.manager.game.word_length}
-                />
+                    <Keyboard
+                        callback={link.callback(move |msg| msg)}
+                        is_unknown={game.is_unknown()}
+                        is_winner={game.is_winner()}
+                        is_guessing={game.is_guessing()}
+                        is_hidden={game.is_hidden()}
+                        is_emojis_copied={self.is_emojis_copied}
+                        is_link_copied={self.is_link_copied}
+                        game_mode={game.game_mode().clone()}
+                        message={game.message()}
+                        word={word}
+                        last_guess={last_guess}
+                        keyboard={keyboard_state}
+                    />
 
-                <Keyboard
-                    callback={link.callback(move |msg| msg)}
-                    is_unknown={self.manager.game.is_unknown}
-                    is_winner={self.manager.game.is_winner}
-                    is_guessing={self.manager.game.is_guessing}
-                    is_hidden={self.manager.game.is_hidden}
-                    is_emojis_copied={self.is_emojis_copied}
-                    is_link_copied={self.is_link_copied}
-                    game_mode={self.manager.game.game_mode}
-                    message={self.manager.game.message.clone()}
-                    word={word}
-                    last_guess={last_guess}
-                    keyboard={keyboard_state}
-                />
-
-                {
-                    if self.is_help_visible {
-                        html! { <HelpModal theme={self.manager.theme} callback={link.callback(move |msg| msg)} /> }
-                    } else {
-                        html! {}
-                    }
-                }
-
-                {
-                    if self.is_menu_visible {
-                        html! {
-                            <MenuModal
-                                callback={link.callback(move |msg| msg)}
-                                game_mode={self.manager.current_game_mode}
-                                word_length={self.manager.current_word_length}
-                                current_word_list={self.manager.current_word_list}
-                                allow_profanities={self.manager.allow_profanities}
-                                theme={self.manager.theme}
-                                max_streak={self.manager.max_streak}
-                                total_played={self.manager.total_played}
-                                total_solved={self.manager.total_solved}
-                            />
+                    {
+                        if self.is_help_visible {
+                            html! { <HelpModal theme={self.manager.theme} callback={link.callback(move |msg| msg)} /> }
+                        } else {
+                            html! {}
                         }
-                    } else {
-                        html! {}
                     }
-                }
-            </div>
+
+                    {
+                        if self.is_menu_visible {
+                            html! {
+                                <MenuModal
+                                    callback={link.callback(move |msg| msg)}
+                                    game_mode={self.manager.current_game_mode}
+                                    word_length={self.manager.current_word_length}
+                                    current_word_list={self.manager.current_word_list}
+                                    allow_profanities={self.manager.allow_profanities}
+                                    theme={self.manager.theme}
+                                    max_streak={self.manager.max_streak}
+                                    total_played={self.manager.total_played}
+                                    total_solved={self.manager.total_solved}
+                                />
+                            }
+                        } else {
+                            html! {}
+                        }
+                    }
+                </div>
+            }
+        } else {
+            html! {
+                <MenuModal
+                    callback={link.callback(move |msg| msg)}
+                    game_mode={self.manager.current_game_mode}
+                    word_length={self.manager.current_word_length}
+                    current_word_list={self.manager.current_word_list}
+                    allow_profanities={self.manager.allow_profanities}
+                    theme={self.manager.theme}
+                    max_streak={self.manager.max_streak}
+                    total_played={self.manager.total_played}
+                    total_solved={self.manager.total_solved}
+                />
+            }
         }
+
+        
     }
 }
 
