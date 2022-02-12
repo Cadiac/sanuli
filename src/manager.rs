@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-use crate::game::{Game, BaseGame};
+use crate::game::{BaseGame, Game};
 
 const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
@@ -76,6 +76,7 @@ pub enum GameMode {
     Relay,
     DailyWord(NaiveDate),
     Shared,
+    Quad,
 }
 
 impl Default for GameMode {

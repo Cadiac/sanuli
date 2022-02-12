@@ -109,19 +109,23 @@ pub struct MenuModalProps {
 #[function_component(MenuModal)]
 pub fn menu_modal(props: &MenuModalProps) -> Html {
     let callback = props.callback.clone();
-
     let today = Local::now().naive_local().date();
-
     let toggle_menu = onmousedown!(callback, Msg::ToggleMenu);
+
     let change_word_length_5 = onmousedown!(callback, Msg::ChangeWordLength(5));
     let change_word_length_6 = onmousedown!(callback, Msg::ChangeWordLength(6));
+
     let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
     let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
     let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
+    let change_game_mode_quad = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quad));
+
     let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
+
     let change_allow_profanities_yes = onmousedown!(callback, Msg::ChangeAllowProfanities(true));
     let change_allow_profanities_no = onmousedown!(callback, Msg::ChangeAllowProfanities(false));
+
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
@@ -191,6 +195,10 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
+                    </button>
+                    <button class={classes!("select", (props.game_mode == GameMode::Quad).then(|| Some("select-active")))}
+                        onmousedown={change_game_mode_quad}>
+                        {"Neluli"}
                     </button>
                 </div>
             </div>

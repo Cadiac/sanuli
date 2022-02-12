@@ -8,6 +8,10 @@ use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 use web_sys::{window, Window};
 
+pub type KnownStates = Vec<HashMap<(char, usize), CharacterState>>;
+pub type KnownCounts = Vec<HashMap<char, CharacterCount>>;
+
+use crate::logic;
 use crate::manager::{
     CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists,
 };
@@ -40,16 +44,14 @@ pub trait Game {
     fn word_length(&self) -> usize;
     fn max_guesses(&self) -> usize;
 
-    fn word(&self) -> &Vec<char>;
-    fn guesses(&self) -> &Vec<Vec<(char, TileState)>>;
-    fn current_guess(&self) -> usize;
+    fn boards(&self) -> Vec<Board>;
     fn streak(&self) -> usize;
 
     fn is_guessing(&self) -> bool;
-    fn is_winner(&self) -> bool;
-    fn is_unknown(&self) -> bool;
     fn is_reset(&self) -> bool;
     fn is_hidden(&self) -> bool;
+    fn is_winner(&self) -> bool;
+    fn is_unknown(&self) -> bool;
 
     fn message(&self) -> String;
 
@@ -63,18 +65,21 @@ impl PartialEq for dyn Game {
             && self.word_list() == other.word_list()
             && self.word_length() == other.word_length()
             && self.max_guesses() == other.max_guesses()
-            && self.word() == other.word()
-            && self.guesses() == other.guesses()
-            && self.current_guess() == other.current_guess()
+            && self.boards() == other.boards()
             && self.streak() == other.streak()
-            && self.is_guessing() == other.is_guessing()
-            && self.is_winner() == other.is_winner()
-            && self.is_unknown() == other.is_unknown()
             && self.is_reset() == other.is_reset()
             && self.is_hidden() == other.is_hidden()
             && self.message() == other.message()
             && self.previous_guesses() == other.previous_guesses()
     }
+}
+
+#[derive(PartialEq)]
+pub struct Board {
+    pub word: Vec<char>,
+    pub guesses: Vec<Vec<(char, TileState)>>,
+    pub current_guess: usize,
+    pub is_guessing: bool,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -106,9 +111,9 @@ pub struct BaseGame {
     #[serde(skip)]
     word_lists: Rc<WordLists>,
     #[serde(skip)]
-    known_states: Vec<HashMap<(char, usize), CharacterState>>,
+    known_states: KnownStates,
     #[serde(skip)]
-    discovered_counts: Vec<HashMap<char, CharacterCount>>,
+    known_counts: KnownCounts,
 }
 
 impl Default for BaseGame {
@@ -141,7 +146,7 @@ impl BaseGame {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let discovered_counts = std::iter::repeat(HashMap::new())
+        let known_counts = std::iter::repeat(HashMap::new())
             .take(max_guesses)
             .collect::<Vec<_>>();
 
@@ -173,7 +178,7 @@ impl BaseGame {
             is_hidden: false,
             message: String::new(),
             known_states,
-            discovered_counts,
+            known_counts,
             guesses,
             previous_guesses: Vec::new(),
             current_guess: 0,
@@ -206,7 +211,7 @@ impl BaseGame {
             .take(max_guesses)
             .collect::<Vec<_>>();
 
-        let discovered_counts = std::iter::repeat(HashMap::new())
+        let known_counts = std::iter::repeat(HashMap::new())
             .take(max_guesses)
             .collect::<Vec<_>>();
 
@@ -225,7 +230,7 @@ impl BaseGame {
             is_hidden: true,
             message: String::new(),
             known_states,
-            discovered_counts,
+            known_counts,
             guesses,
             previous_guesses: Vec::new(),
             current_guess,
@@ -313,12 +318,12 @@ impl BaseGame {
             .collect()
     }
 
-    fn current_guess_state(&mut self, character: char, index: usize) -> TileState {
-        match self.known_states[self.current_guess].get(&(character, index)) {
+    fn tile_state(&mut self, character: char, guess_index: usize) -> TileState {
+        match self.known_states[self.current_guess].get(&(character, guess_index)) {
             Some(CharacterState::Correct) => TileState::Correct,
             Some(CharacterState::Absent) => TileState::Absent,
             _ => {
-                match self.discovered_counts[self.current_guess].get(&character) {
+                match self.known_counts[self.current_guess].get(&character) {
                     Some(CharacterCount::Exactly(count)) => {
                         // We may know the exact count, but not the exact index of any characters..
                         if *count == 0 {
@@ -346,7 +351,7 @@ impl BaseGame {
         }
     }
 
-    fn reveal_row_tiles(&mut self, row: usize) {
+    fn update_known_states(&mut self, row: usize) {
         if let Some(guess) = self.guesses.get_mut(row) {
             let mut revealed_count_on_row: HashMap<char, usize> =
                 HashMap::with_capacity(self.word_length);
@@ -373,7 +378,7 @@ impl BaseGame {
                             .and_modify(|count| *count += 1)
                             .or_insert(1);
 
-                        let discovered_count = self.discovered_counts[row]
+                        let discovered_count = self.known_counts[row]
                             .get(character)
                             .unwrap_or(&CharacterCount::AtLeast(0));
 
@@ -395,7 +400,7 @@ impl BaseGame {
         }
     }
 
-    fn calculate_current_guess(&mut self) {
+    fn update_states_and_counts(&mut self) {
         for (index, (character, _)) in self.guesses[self.current_guess].iter().enumerate() {
             let known = self.known_states[self.current_guess]
                 .entry((*character, index))
@@ -406,39 +411,14 @@ impl BaseGame {
             } else {
                 *known = CharacterState::Absent;
 
-                let discovered_count = self.discovered_counts[self.current_guess]
-                    .entry(*character)
-                    .or_insert(CharacterCount::AtLeast(0));
-
-                // At most the same amount of characters are highlighted as there are in the word
-                let count_in_word = self.word.iter().filter(|c| *c == character).count();
-                if count_in_word == 0 {
-                    *discovered_count = CharacterCount::Exactly(0);
-                    continue;
-                }
-
-                let count_in_guess = self.guesses[self.current_guess]
-                    .iter()
-                    .filter(|(c, _)| c == character)
-                    .count();
-
-                match discovered_count {
-                    CharacterCount::AtLeast(count) => {
-                        if count_in_guess > count_in_word {
-                            if count_in_word >= *count {
-                                // The guess had more copies of the character than the word,
-                                // the exact count is revealed
-                                *discovered_count = CharacterCount::Exactly(count_in_word);
-                            }
-                        } else if count_in_guess == count_in_word || count_in_guess > *count {
-                            // One of:
-                            // 1) The count had the exact count but that isn't revealed yet
-                            // 2) Found more than before, but the exact count is still unknown
-                            *discovered_count = CharacterCount::AtLeast(count_in_guess);
-                        }
-                    }
-                    // Exact count should never change
-                    CharacterCount::Exactly(_) => {}
+                if let Some(updated_count) = logic::updated_known_count(
+                    character,
+                    self.current_guess,
+                    &self.guesses[self.current_guess],
+                    &self.known_counts,
+                    &self.word,
+                ) {
+                    self.known_counts[self.current_guess].insert(*character, updated_count);
                 }
             }
         }
@@ -447,10 +427,10 @@ impl BaseGame {
         if self.current_guess < self.max_guesses - 1 {
             let next = self.current_guess + 1;
             self.known_states[next] = self.known_states[self.current_guess].clone();
-            self.discovered_counts[next] = self.discovered_counts[self.current_guess].clone();
+            self.known_counts[next] = self.known_counts[self.current_guess].clone();
         }
 
-        self.reveal_row_tiles(self.current_guess);
+        self.update_known_states(self.current_guess);
     }
 
     fn is_guess_allowed(&self) -> bool {
@@ -546,32 +526,35 @@ impl Game for BaseGame {
     fn max_guesses(&self) -> usize {
         self.max_guesses
     }
-    fn word(&self) -> &Vec<char> {
-        &self.word
+    fn boards(&self) -> Vec<Board> {
+        let board = Board {
+            word: self.word.clone(),
+            guesses: self.guesses.clone(),
+            current_guess: self.current_guess,
+            is_guessing: self.is_guessing,
+        };
+
+        vec![board]
     }
-    fn guesses(&self) -> &Vec<Vec<(char, TileState)>> {
-        &self.guesses
-    }
-    fn current_guess(&self) -> usize {
-        self.current_guess
-    }
+
     fn streak(&self) -> usize {
         self.streak
     }
+
     fn is_guessing(&self) -> bool {
         self.is_guessing
     }
     fn is_winner(&self) -> bool {
         self.is_winner
     }
-    fn is_unknown(&self) -> bool {
-        self.is_unknown
-    }
     fn is_reset(&self) -> bool {
         self.is_reset
     }
     fn is_hidden(&self) -> bool {
         self.is_hidden
+    }
+    fn is_unknown(&self) -> bool {
+        self.is_unknown
     }
     fn message(&self) -> String {
         self.message.clone()
@@ -628,7 +611,7 @@ impl Game for BaseGame {
         self.known_states = std::iter::repeat(HashMap::new())
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
-        self.discovered_counts = std::iter::repeat(HashMap::new())
+        self.known_counts = std::iter::repeat(HashMap::new())
             .take(DEFAULT_MAX_GUESSES)
             .collect::<Vec<_>>();
 
@@ -649,7 +632,7 @@ impl Game for BaseGame {
             self.guesses.extend(empty_guesses);
 
             self.current_guess = 0;
-            self.calculate_current_guess();
+            self.update_states_and_counts();
             self.current_guess = 1;
         } else {
             self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
@@ -687,28 +670,12 @@ impl Game for BaseGame {
     }
 
     fn keyboard_tilestate(&self, key: &char) -> TileState {
-        let is_correct = self.known_states[self.current_guess]
-            .iter()
-            .any(|((c, _index), state)| c == key && state == &CharacterState::Correct);
-        if is_correct {
-            return TileState::Correct;
-        }
-
-        match self.discovered_counts[self.current_guess].get(key) {
-            Some(CharacterCount::AtLeast(count)) => {
-                if *count == 0 {
-                    return TileState::Unknown;
-                }
-                TileState::Present
-            }
-            Some(CharacterCount::Exactly(count)) => {
-                if *count == 0 {
-                    return TileState::Absent;
-                }
-                TileState::Present
-            }
-            None => TileState::Unknown,
-        }
+        logic::keyboard_tilestate(
+            key,
+            self.current_guess,
+            &self.known_states,
+            &self.known_counts,
+        )
     }
 
     fn submit_guess(&mut self) {
@@ -726,7 +693,7 @@ impl Game for BaseGame {
         self.clear_message();
 
         self.is_winner = self.is_correct_word();
-        self.calculate_current_guess();
+        self.update_states_and_counts();
         if self.is_game_ended() {
             self.is_guessing = false;
 
@@ -755,8 +722,7 @@ impl Game for BaseGame {
 
         self.clear_message();
 
-        let tile_state =
-            self.current_guess_state(character, self.guesses[self.current_guess].len());
+        let tile_state = self.tile_state(character, self.guesses[self.current_guess].len());
         self.guesses[self.current_guess].push((character, tile_state));
     }
 
@@ -857,7 +823,7 @@ impl Game for BaseGame {
             .take(self.max_guesses)
             .collect::<Vec<_>>();
 
-        self.discovered_counts = std::iter::repeat(HashMap::new())
+        self.known_counts = std::iter::repeat(HashMap::new())
             .take(self.max_guesses)
             .collect::<Vec<_>>();
 
@@ -869,15 +835,15 @@ impl Game for BaseGame {
             .take(self.max_guesses)
             .collect::<Vec<_>>();
 
-        self.discovered_counts = std::iter::repeat(HashMap::new())
+        self.known_counts = std::iter::repeat(HashMap::new())
             .take(self.max_guesses)
             .collect::<Vec<_>>();
 
         let current_guess = self.current_guess;
-        // Rerun the game to repuplate known_states and discovered_counts
+        // Rerun the game to repuplate known_states and known_counts
         for guess_index in 0..self.current_guess {
             self.current_guess = guess_index;
-            self.calculate_current_guess();
+            self.update_states_and_counts();
         }
 
         // Restore the current guess
@@ -885,7 +851,7 @@ impl Game for BaseGame {
 
         // If the game is ended also recalculate the current guess
         if !self.is_guessing {
-            self.calculate_current_guess();
+            self.update_states_and_counts();
         }
     }
 

@@ -18,7 +18,7 @@ pub struct Props {
 #[function_component(Board)]
 pub fn board(props: &Props) -> Html {
     html! {
-        <div class="board-container">
+        <>
             {
                 if !props.previous_guesses.is_empty() && props.is_reset {
                     html! {
@@ -69,7 +69,7 @@ pub fn board(props: &Props) -> Html {
                     }).collect::<Html>()
                 }
             </div>
-        </div>
+        </>
     }
 }
 

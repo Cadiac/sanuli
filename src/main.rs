@@ -8,6 +8,7 @@ use yew::prelude::*;
 mod components;
 mod manager;
 mod game;
+mod logic;
 
 use components::{
     board::Board,
@@ -124,14 +125,14 @@ impl Component for App {
                 let link = ctx.link();
 
                 if let Some(game) = &self.manager.game {
-                    if !game.is_guessing() {
+                    if game.is_guessing() {
+                        link.send_message(Msg::Guess);
+                    } else {
                         if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
                             link.send_message(Msg::ChangePreviousGameMode);
                         } else {
                             link.send_message(Msg::NextWord);
                         }
-                    } else {
-                        link.send_message(Msg::Guess);
                     }
                 }
             }
@@ -222,10 +223,10 @@ impl Component for App {
                 .map(|key| (*key, game.keyboard_tilestate(key)))
                 .collect::<HashMap<char, TileState>>();
 
-            let last_guess = game.guesses()[game.current_guess()]
-                .iter()
-                .map(|(c, _)| c)
-                .collect::<String>();
+            // let last_guess = game.guesses()[game.current_guess()]
+            //     .iter()
+            //     .map(|(c, _)| c)
+            //     .collect::<String>();
 
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
@@ -235,16 +236,28 @@ impl Component for App {
                         title={game.title()}
                     />
 
-                    <Board
-                        is_guessing={game.is_guessing()}
-                        is_reset={game.is_reset()}
-                        is_hidden={game.is_hidden()}
-                        guesses={game.guesses().clone()}
-                        previous_guesses={game.previous_guesses().clone()}
-                        current_guess={game.current_guess()}
-                        max_guesses={game.max_guesses()}
-                        word_length={game.word_length()}
-                    />
+                    {
+                        html! {
+                            <div class="board-container">
+                                {game.boards().iter().map(|board| {
+                                    html! {
+                                        <Board
+                                            guesses={board.guesses.clone()}
+                                            is_guessing={board.is_guessing}
+                                            current_guess={board.current_guess}
+
+                                            is_reset={game.is_reset()}
+                                            is_hidden={game.is_hidden()}
+                                            previous_guesses={game.previous_guesses().clone()}
+                                            
+                                            max_guesses={game.max_guesses()}
+                                            word_length={game.word_length()}
+                                        />
+                                    }
+                                }).collect::<Html>()}
+                            </div>
+                        }
+                    }
 
                     <Keyboard
                         callback={link.callback(move |msg| msg)}
@@ -256,8 +269,10 @@ impl Component for App {
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
                         message={game.message()}
-                        word={game.word().iter().collect::<String>()}
-                        last_guess={last_guess}
+                        // word={game.word().iter().collect::<String>()}
+                        word={String::new()}
+                        // last_guess={last_guess}
+                        last_guess={String::new()}
                         keyboard={keyboard_state}
                     />
 
