@@ -466,6 +466,7 @@ impl Manager {
                 self.max_streak = streak;
             }
         }
+        let _res = self.persist();
     }
 
     #[cfg(web_sys_unstable_apis)]
