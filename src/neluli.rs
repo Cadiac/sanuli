@@ -10,11 +10,11 @@ use crate::manager::{GameMode, KeyState, Theme, TileState, WordList, WordLists};
 use crate::sanuli::Sanuli;
 
 const MAX_GUESSES: usize = 9;
-const WORD_LENGTH: usize = 5; // TODO: Just handle this as a default and get it from manager at new
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Neluli {
     pub word_list: WordList,
+    pub word_length: usize,
     pub boards: Vec<Sanuli>,
     pub streak: usize,
     pub message: String,
@@ -80,6 +80,7 @@ impl Neluli {
 
         Self {
             word_list,
+            word_length,
 
             boards,
             streak: 0,
@@ -125,7 +126,7 @@ impl Game for Neluli {
         &self.word_list
     }
     fn word_length(&self) -> usize {
-        WORD_LENGTH
+        self.word_length
     }
     fn max_guesses(&self) -> usize {
         MAX_GUESSES
