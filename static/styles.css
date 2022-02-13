@@ -139,6 +139,7 @@ header {
     top: -39px;
     height: 39px;
     width: 100vw;
+    max-width: 500px;
     font-weight: 700;
     font-size: 14px;
     letter-spacing: 0.2rem;
@@ -193,7 +194,8 @@ header {
     justify-content: center;
     align-items: flex-start;
     flex-grow: 1;
-    overflow-y: scroll;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .quadruple-grid {
@@ -203,7 +205,7 @@ header {
     display: grid;
     justify-content: center;
     align-items: center;
-    padding-bottom: 2rem;
+    padding-bottom: 3rem;
 }
 
 .board-9 {
@@ -518,6 +520,9 @@ header {
     text-transform: uppercase;
     user-select: none;
     border: 2px solid #3a3a3c;
+
+    user-select: none;
+    -webkit-user-select: none; /* Prevent selection on iOS */
 }
 
 .present {
