@@ -41,21 +41,29 @@ pub fn keyboard(props: &Props) -> Html {
 
     html! {
         <div class="keyboard">
-            <Message
-                message={props.message.clone()}
-                is_unknown={props.is_unknown}
-                is_winner={props.is_winner}
-                is_guessing={props.is_guessing}
-                is_hidden={props.is_hidden}
-
-                is_emojis_copied={props.is_emojis_copied}
-                is_link_copied={props.is_link_copied}
-
-                last_guess={props.last_guess.clone()}
-                word={props.word.clone()}
-                game_mode={props.game_mode}
-                callback={props.callback.clone()}
-            />
+            {
+                if props.message.is_empty() {
+                    html! {}
+                } else {
+                    html! {
+                        <Message
+                            message={props.message.clone()}
+                            is_unknown={props.is_unknown}
+                            is_winner={props.is_winner}
+                            is_guessing={props.is_guessing}
+                            is_hidden={props.is_hidden}
+            
+                            is_emojis_copied={props.is_emojis_copied}
+                            is_link_copied={props.is_link_copied}
+            
+                            last_guess={props.last_guess.clone()}
+                            word={props.word.clone()}
+                            game_mode={props.game_mode}
+                            callback={props.callback.clone()}
+                        />
+                    }
+                }
+            }
 
             <div class="keyboard-row">
                 {

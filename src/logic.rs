@@ -214,7 +214,7 @@ pub fn update_known_information(
     // Copy the previous knowledge to the next guess
     if guess_index < max_guesses - 1 {
         let next = guess_index + 1;
-        states[next] = states[guess_index].clone(); // TODO: This sometimes breaks to panicked at 'index out of bounds: the len is 6 but the index is 6', src/logic.rs:217:9
+        states[next] = states[guess_index].clone();
         counts[next] = counts[guess_index].clone();
     }
 

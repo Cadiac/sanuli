@@ -10,7 +10,7 @@ use crate::manager::{GameMode, Theme, TileState, WordList, WordLists};
 use crate::sanuli::Sanuli;
 
 const MAX_GUESSES: usize = 9;
-const WORD_LENGTH: usize = 5;
+const WORD_LENGTH: usize = 5; // TODO: Just handle this as a default and get it from manager at new
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Neluli {

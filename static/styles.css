@@ -133,7 +133,10 @@ header {
     margin-bottom: 0px;
     text-shadow: 2px 2px 10px #000000;
     background: linear-gradient(180deg, var(--background-transparent), var(--background));
-    min-height: 39px;
+    position: absolute;
+    top: -39px;
+    height: 39px;
+    width: 100vw;
     font-weight: 700;
     font-size: 14px;
     letter-spacing: 0.2rem;
@@ -169,7 +172,7 @@ header {
     justify-content: center;
     align-items: center;
     flex-grow: 1;
-    overflow-y: scroll;
+    overflow: hidden;
 }
 
 .board-6 {
@@ -184,6 +187,14 @@ header {
 }
 
 .quad-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-grow: 1;
+    overflow-y: scroll;
+}
+
+.quad-grid {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
     grid-gap: 10px;
@@ -195,16 +206,19 @@ header {
 .board-9 {
     display: grid;
     grid-template-rows: repeat(9, 1fr);
-    width: 170px;
-    height: 310px;
+    width: 100%;
+    height: 100%;
     grid-gap: 5px;
     padding: 0px;
+    margin: auto;
     box-sizing: border-box;
 }
 
 .board-9 .tile {
     font-size: 1rem;
     line-height: 1rem;
+    height: 2rem;
+    width: 2rem;
 }
 
 .keyboard {
@@ -213,6 +227,7 @@ header {
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
+    position: relative;
     margin-left: 12px;
     margin-right: 6px;
     margin-bottom: 6px;

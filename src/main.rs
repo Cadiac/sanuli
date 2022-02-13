@@ -241,8 +241,8 @@ impl Component for App {
                     {
                         if self.manager.current_game_mode == GameMode::Quad {
                             html! {
-                                <div class="board-container">
-                                    <div class="quad-container">
+                                <div class="quad-container">
+                                    <div class="quad-grid">
                                         {game.boards().iter().map(|board| {
                                             html! {
                                                 <Board

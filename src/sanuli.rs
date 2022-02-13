@@ -437,10 +437,10 @@ impl Game for Sanuli {
         self.guesses = Vec::with_capacity(self.max_guesses);
 
         self.known_states = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
+            .take(self.max_guesses)
             .collect::<Vec<_>>();
         self.known_counts = std::iter::repeat(HashMap::new())
-            .take(DEFAULT_MAX_GUESSES)
+            .take(self.max_guesses)
             .collect::<Vec<_>>();
 
         if previous_word.len() == self.word_length
