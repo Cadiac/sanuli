@@ -78,7 +78,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 sekä muut erikoisuudet pois. Laajalla listalla ei tätä karsintaa ole tehty, ja listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia."}
             </p>
             <p>
-                {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin kirjakieltä."}
+                {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin kirjakieltä. Yhdyssanojakin on seassa."}
             </p>
             <p>
                 {"Päivän sanulit tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla aina sama kaikille pelaajille tiettynä päivänä."}
