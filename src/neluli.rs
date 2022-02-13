@@ -2,7 +2,7 @@ use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use gloo_storage::errors::StorageError;
+use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
 use crate::game::{Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS};
@@ -13,11 +13,11 @@ const MAX_GUESSES: usize = 9;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Neluli {
-    pub word_list: WordList,
-    pub word_length: usize,
-    pub boards: Vec<Sanuli>,
-    pub streak: usize,
-    pub message: String,
+    word_list: WordList,
+    word_length: usize,
+    boards: Vec<Sanuli>,
+    streak: usize,
+    message: String,
 
     #[serde(skip)]
     allow_profanities: bool,
@@ -90,6 +90,57 @@ impl Neluli {
             allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             word_lists,
         }
+    }
+
+    pub fn new_or_rehydrate(
+        word_list: WordList,
+        word_length: usize,
+        allow_profanities: bool,
+        word_lists: Rc<WordLists>,
+    ) -> Self {
+        if let Ok(game) = Self::rehydrate(
+            word_list,
+            word_length,
+            allow_profanities,
+            word_lists.clone(),
+        ) {
+            game
+        } else {
+            Self::new(
+                word_list,
+                word_length,
+                allow_profanities,
+                word_lists,
+            )
+        }
+    }
+
+    fn rehydrate(
+        word_list: WordList,
+        word_length: usize,
+        allow_profanities: bool,
+        word_lists: Rc<WordLists>,
+    ) -> Result<Self, StorageError> {
+        let game_key = &format!(
+            "game|{}|{}|{}",
+            serde_json::to_string(&GameMode::Quadruple).unwrap(),
+            serde_json::to_string(&word_list).unwrap(),
+            word_length
+        );
+
+        let mut game: Self = LocalStorage::get(game_key)?;
+
+        for board in game.boards.iter_mut() {
+            board.set_word_lists(word_lists.clone());
+            board.set_allow_profanities(allow_profanities);
+        }
+
+        game.allow_profanities = allow_profanities;
+        game.word_lists = word_lists;
+
+        game.refresh();
+
+        Ok(game)
     }
 
     fn is_game_ended(&self) -> bool {
@@ -180,6 +231,8 @@ impl Game for Neluli {
             board.next_word();
         }
         self.clear_message();
+
+        let _res = self.persist();
     }
 
     fn prepare_previous_guesses_animation(&mut self, _previous_length: usize) {}
@@ -215,6 +268,8 @@ impl Game for Neluli {
         } else {
             self.clear_message();
         }
+
+        let _res = self.persist();
     }
 
     fn push_character(&mut self, character: char) {
@@ -264,6 +319,13 @@ impl Game for Neluli {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        Ok(())
+        let game_key = &format!(
+            "game|{}|{}|{}",
+            serde_json::to_string(&GameMode::Quadruple).unwrap(),
+            serde_json::to_string(&self.word_list).unwrap(),
+            self.word_length
+        );
+
+        LocalStorage::set(game_key, self)
     }
 }

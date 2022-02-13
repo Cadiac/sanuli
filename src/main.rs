@@ -8,7 +8,6 @@ use yew::prelude::*;
 mod components;
 mod manager;
 mod game;
-mod logic;
 mod sanuli;
 mod neluli;
 

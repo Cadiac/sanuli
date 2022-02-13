@@ -3,6 +3,7 @@
     --absent: #3e3e3e;
     --correct: #6aaa64;
     --unknown: #818384;
+    --highlight: #f5793a;
     --background: #121212;
     --background-transparent: #12121200;
     --text: #d7dadc;
@@ -20,6 +21,7 @@
 .colorblind {
     --correct: #f5793a;
     --present: #85c0f9;
+    --highlight: #c9b458;
 }
 
 html {
@@ -579,6 +581,11 @@ header {
 .select-active {
     background-color: var(--absent);
     border: 2px solid var(--correct);
+}
+
+.new-feature {
+    background-color: var(--background);
+    border: 2px dotted var(--highlight);
 }
 
 .version {

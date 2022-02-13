@@ -15,7 +15,7 @@ use crate::game::{
     Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH,
     SUCCESS_EMOJIS,
 };
-use crate::logic;
+use crate::game;
 use crate::manager::{
     CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists, KeyState,
 };
@@ -24,27 +24,27 @@ const DAILY_WORDS: &str = include_str!("../daily-words.txt");
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Sanuli {
-    pub game_mode: GameMode,
-    pub word_list: WordList,
-    pub word_length: usize,
-    pub max_guesses: usize,
+    game_mode: GameMode,
+    word_list: WordList,
+    word_length: usize,
+    max_guesses: usize,
 
-    pub word: Vec<char>,
-    pub guesses: Vec<Vec<(char, TileState)>>,
-    pub current_guess: usize,
-    pub streak: usize,
+    word: Vec<char>,
+    guesses: Vec<Vec<(char, TileState)>>,
+    current_guess: usize,
+    streak: usize,
 
-    pub is_guessing: bool,
-    pub is_winner: bool,
-    pub is_unknown: bool,
-    pub is_reset: bool,
+    is_guessing: bool,
+    is_winner: bool,
+    is_unknown: bool,
+    is_reset: bool,
     #[serde(skip)]
-    pub is_hidden: bool,
+    is_hidden: bool,
 
-    pub message: String,
+    message: String,
 
     #[serde(skip)]
-    pub previous_guesses: Vec<Vec<(char, TileState)>>,
+    previous_guesses: Vec<Vec<(char, TileState)>>,
 
     #[serde(skip)]
     allow_profanities: bool,
@@ -207,6 +207,10 @@ impl Sanuli {
                 word_lists,
             )
         }
+    }
+
+    pub fn set_word_lists(&mut self, word_lists: Rc<WordLists>) {
+        self.word_lists = word_lists;
     }
 
     fn get_word(
@@ -467,7 +471,7 @@ impl Game for Sanuli {
 
             self.current_guess = 0;
             // Update the known states of the word from previous round
-            logic::update_known_information(
+            game::update_known_information(
                 &mut self.known_states,
                 &mut self.known_counts,
                 &mut self.guesses[self.current_guess],
@@ -512,7 +516,7 @@ impl Game for Sanuli {
     }
 
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
-        KeyState::Single(logic::keyboard_tile_state(
+        KeyState::Single(game::keyboard_tile_state(
             key,
             self.current_guess,
             &self.known_states,
@@ -535,7 +539,7 @@ impl Game for Sanuli {
         self.clear_message();
 
         self.is_winner = self.is_correct_word();
-        logic::update_known_information(
+        game::update_known_information(
             &mut self.known_states,
             &mut self.known_counts,
             &mut self.guesses[self.current_guess],
@@ -572,7 +576,7 @@ impl Game for Sanuli {
         self.clear_message();
 
         // Display a hint of the tile state based on already known information
-        let tile_state = logic::hint_tile_state(
+        let tile_state = game::hint_tile_state(
             character,
             self.guesses[self.current_guess].len(),
             self.current_guess,
@@ -697,7 +701,7 @@ impl Game for Sanuli {
 
         // Rerun the game to refresh known_states and known_counts
         for guess_index in 0..self.current_guess {
-            logic::update_known_information(
+            game::update_known_information(
                 &mut self.known_states,
                 &mut self.known_counts,
                 &mut self.guesses[guess_index],
@@ -709,7 +713,7 @@ impl Game for Sanuli {
 
         // If the game is ended also update the current guess
         if !self.is_guessing {
-            logic::update_known_information(
+            game::update_known_information(
                 &mut self.known_states,
                 &mut self.known_counts,
                 &mut self.guesses[self.current_guess],
@@ -722,7 +726,8 @@ impl Game for Sanuli {
 
     fn persist(&self) -> Result<(), StorageError> {
         if matches!(self.game_mode, GameMode::Shared | GameMode::Quadruple) {
-            // Never persist shared or quadruple games
+            // Never persist shared or subgames within quadruple mode
+            // The quadruple subgames should never call this persist anyways.
             return Ok(());
         }
 

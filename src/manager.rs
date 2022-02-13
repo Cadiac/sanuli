@@ -225,15 +225,27 @@ impl Manager {
                 }
             }
 
-            let game = Sanuli::new_or_rehydrate(
-                manager.current_game_mode,
-                manager.current_word_list,
-                manager.current_word_length,
-                manager.allow_profanities,
-                word_lists.clone(),
-            );
+            match manager.current_game_mode {
+                GameMode::Classic | GameMode::Relay | GameMode::DailyWord(_) => {
+                    manager.game = Some(Box::new(Sanuli::new_or_rehydrate(
+                        manager.current_game_mode,
+                        manager.current_word_list,
+                        manager.current_word_length,
+                        manager.allow_profanities,
+                        word_lists.clone(),
+                    )));
+                }
+                GameMode::Quadruple => {
+                    manager.game = Some(Box::new(Neluli::new_or_rehydrate(
+                        manager.current_word_list,
+                        manager.current_word_length,
+                        manager.allow_profanities,
+                        word_lists.clone(),
+                    )));
+                }
+                GameMode::Shared => {}
+            };
 
-            manager.game = Some(Box::new(game));
             manager.word_lists = word_lists;
 
             manager
@@ -262,12 +274,12 @@ impl Manager {
 
         // If this is a shared game switch to it immediately. Set the game we were going to display in the background
         if let Some(game) = initial_manager.rehydrate_shared_game() {
-            initial_manager.current_game_mode = game.game_mode;
-            initial_manager.current_word_length = game.word_length;
-            initial_manager.current_word_list = game.word_list;
+            initial_manager.current_game_mode = *game.game_mode();
+            initial_manager.current_word_list = *game.word_list();
+            initial_manager.current_word_length = game.word_length();
 
             initial_manager.background_games.insert(
-                (game.game_mode, game.word_list, game.word_length),
+                (*game.game_mode(), *game.word_list(), game.word_length()),
                 Box::new(game),
             );
 
@@ -479,7 +491,7 @@ impl Manager {
                         self.allow_profanities,
                         self.word_lists.clone(),
                     )),
-                    GameMode::Quadruple => Box::new(Neluli::new(
+                    GameMode::Quadruple => Box::new(Neluli::new_or_rehydrate(
                         next_game.1,
                         next_game.2,
                         self.allow_profanities,
@@ -490,9 +502,8 @@ impl Manager {
         // Prepare the previous game slide out animation
         game.prepare_previous_guesses_animation(previous_game.2);
 
-        if let Some(suspended) = mem::replace(&mut self.game, Some(game)) {
-            self.background_games.insert(previous_game, suspended);
-        }
+        self.game = Some(game);
+        self.background_games.insert(previous_game, previous);
     }
 
     fn update_game_statistics(&mut self, is_winner: bool, streak: usize) {
@@ -531,8 +542,8 @@ impl Manager {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        if matches!(self.current_game_mode, GameMode::Shared | GameMode::Quadruple) {
-            // Never persist shared or quadruple games
+        if matches!(self.current_game_mode, GameMode::Shared) {
+            // Never persist shared games
             return Ok(());
         }
 
