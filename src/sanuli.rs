@@ -11,13 +11,13 @@ use web_sys::{window, Window};
 pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
+use crate::game;
 use crate::game::{
     Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH,
     SUCCESS_EMOJIS,
 };
-use crate::game;
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists, KeyState,
+    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList, WordLists,
 };
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
@@ -264,7 +264,7 @@ impl Sanuli {
     }
 
     pub fn is_guess_correct_length(&self) -> bool {
-       self.guesses[self.current_guess].len() == self.word_length
+        self.guesses[self.current_guess].len() == self.word_length
     }
 
     pub fn is_guess_accepted_word(&self) -> bool {
@@ -495,26 +495,6 @@ impl Game for Sanuli {
         let _result = self.persist();
     }
 
-    fn prepare_previous_guesses_animation(&mut self, previous_length: usize) {
-        // For playing the animation populate previous_guesses.
-        // This renders the previous game that slides and fades out.
-        if previous_length <= self.word_length {
-            self.previous_guesses = self.guesses.clone();
-        } else {
-            self.previous_guesses = self
-                .guesses
-                .iter()
-                .cloned()
-                .map(|guess| guess.into_iter().take(self.word_length).collect())
-                .collect();
-        }
-
-        if self.current_guess < self.max_guesses - 1 {
-            self.previous_guesses.truncate(self.current_guess);
-        }
-        self.is_reset = true;
-    }
-
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
         KeyState::Single(game::keyboard_tile_state(
             key,
@@ -550,9 +530,7 @@ impl Game for Sanuli {
         if self.is_game_ended() {
             self.is_guessing = false;
 
-            if matches!(self.game_mode, GameMode::DailyWord(_))
-                || matches!(self.game_mode, GameMode::Shared)
-            {
+            if matches!(self.game_mode, GameMode::DailyWord(_) | GameMode::Shared | GameMode::Quadruple) {
                 // Do nothing, don't update streaks
             } else if self.is_winner {
                 self.streak += 1;

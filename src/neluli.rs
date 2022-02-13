@@ -106,12 +106,7 @@ impl Neluli {
         ) {
             game
         } else {
-            Self::new(
-                word_list,
-                word_length,
-                allow_profanities,
-                word_lists,
-            )
+            Self::new(word_list, word_length, allow_profanities, word_lists)
         }
     }
 
@@ -223,7 +218,11 @@ impl Game for Neluli {
     }
 
     fn title(&self) -> String {
-        String::from("Neluli")
+        if self.streak > 0 {
+            format!("Neluli — Putki: {}", self.streak)
+        } else {
+            "Neluli".to_owned()
+        }
     }
 
     fn next_word(&mut self) {
@@ -235,14 +234,28 @@ impl Game for Neluli {
         let _res = self.persist();
     }
 
-    fn prepare_previous_guesses_animation(&mut self, _previous_length: usize) {}
-
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
         KeyState::Quadruple([
-            if let KeyState::Single(state) = self.boards[0].keyboard_tilestate(key) { state } else { TileState::Unknown },
-            if let KeyState::Single(state) = self.boards[1].keyboard_tilestate(key) { state } else { TileState::Unknown },
-            if let KeyState::Single(state) = self.boards[2].keyboard_tilestate(key) { state } else { TileState::Unknown },
-            if let KeyState::Single(state) = self.boards[3].keyboard_tilestate(key) { state } else { TileState::Unknown },
+            if let KeyState::Single(state) = self.boards[0].keyboard_tilestate(key) {
+                state
+            } else {
+                TileState::Unknown
+            },
+            if let KeyState::Single(state) = self.boards[1].keyboard_tilestate(key) {
+                state
+            } else {
+                TileState::Unknown
+            },
+            if let KeyState::Single(state) = self.boards[2].keyboard_tilestate(key) {
+                state
+            } else {
+                TileState::Unknown
+            },
+            if let KeyState::Single(state) = self.boards[3].keyboard_tilestate(key) {
+                state
+            } else {
+                TileState::Unknown
+            },
         ])
     }
 
@@ -265,6 +278,12 @@ impl Game for Neluli {
 
         if self.is_game_ended() {
             self.set_game_end_message();
+
+            if self.is_winner() {
+                self.streak += 1;
+            } else {
+                self.streak = 0;
+            }
         } else {
             self.clear_message();
         }

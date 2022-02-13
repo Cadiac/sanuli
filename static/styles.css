@@ -589,7 +589,7 @@ header {
 
 .new-feature {
     background-color: var(--background);
-    border: 2px dashed var(--present);
+    border: 2px solid var(--present);
 }
 
 .version {

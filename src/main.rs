@@ -6,10 +6,10 @@ use web_sys::{window, Window};
 use yew::prelude::*;
 
 mod components;
-mod manager;
 mod game;
-mod sanuli;
+mod manager;
 mod neluli;
+mod sanuli;
 
 use components::{
     board::Board,
@@ -17,7 +17,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use manager::{GameMode, Manager, Theme, WordList, KeyState};
+use manager::{GameMode, KeyState, Manager, Theme, WordList};
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -208,7 +208,7 @@ impl Component for App {
                 }
                 self.is_link_copied = true;
                 self.is_emojis_copied = false;
-            },
+            }
             Msg::RevealHiddenTiles => self.manager.reveal_hidden_tiles(),
             Msg::ResetGame => self.manager.reset_game(),
         };
@@ -226,6 +226,8 @@ impl Component for App {
 
             let last_guess = game.last_guess();
 
+            let boards = game.boards();
+
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
                     <Header
@@ -235,8 +237,22 @@ impl Component for App {
                     />
 
                     {
-                        if self.manager.current_game_mode == GameMode::Quadruple {
-                            html! {
+                        match boards.len() {
+                            1 => html! {
+                                <div class="board-container">
+                                    <Board
+                                        guesses={boards[0].guesses.clone()}
+                                        is_guessing={boards[0].is_guessing}
+                                        current_guess={boards[0].current_guess}
+                                        is_reset={game.is_reset()}
+                                        is_hidden={game.is_hidden()}
+                                        previous_guesses={game.previous_guesses().clone()}
+                                        max_guesses={game.max_guesses()}
+                                        word_length={game.word_length()}
+                                    />
+                                </div>
+                            },
+                            4 => html! {
                                 <div class="quadruple-container">
                                     <div class="quadruple-grid">
                                         {game.boards().iter().map(|board| {
@@ -245,11 +261,9 @@ impl Component for App {
                                                     guesses={board.guesses.clone()}
                                                     is_guessing={board.is_guessing}
                                                     current_guess={board.current_guess}
-
                                                     is_reset={game.is_reset()}
                                                     is_hidden={game.is_hidden()}
                                                     previous_guesses={game.previous_guesses().clone()}
-                                                    
                                                     max_guesses={game.max_guesses()}
                                                     word_length={game.word_length()}
                                                 />
@@ -257,28 +271,8 @@ impl Component for App {
                                         }).collect::<Html>()}
                                     </div>
                                 </div>
-                            }
-                        } else {
-                            html! {
-                                <div class="board-container">
-                                    {game.boards().iter().map(|board| {
-                                        html! {
-                                            <Board
-                                                guesses={board.guesses.clone()}
-                                                is_guessing={board.is_guessing}
-                                                current_guess={board.current_guess}
-    
-                                                is_reset={game.is_reset()}
-                                                is_hidden={game.is_hidden()}
-                                                previous_guesses={game.previous_guesses().clone()}
-                                                
-                                                max_guesses={game.max_guesses()}
-                                                word_length={game.word_length()}
-                                            />
-                                        }
-                                    }).collect::<Html>()}
-                                </div>
-                            }
+                            },
+                            _ => html! {}
                         }
                     }
 
@@ -341,8 +335,6 @@ impl Component for App {
                 />
             }
         }
-
-        
     }
 }
 

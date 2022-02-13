@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
-use gloo_storage::{errors::StorageError};
+use gloo_storage::errors::StorageError;
 
 pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, KeyState,
+    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList,
 };
 
-pub const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
+pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏", ":3"];
 pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
@@ -29,8 +29,6 @@ pub trait Game {
     fn persist(&self) -> Result<(), StorageError>;
     fn set_allow_profanities(&mut self, is_allowed: bool);
 
-    fn prepare_previous_guesses_animation(&mut self, previous_length: usize);
-
     fn game_mode(&self) -> &GameMode;
     fn word_list(&self) -> &WordList;
     fn word_length(&self) -> usize;
@@ -48,7 +46,6 @@ pub trait Game {
     fn is_unknown(&self) -> bool;
 
     fn message(&self) -> String;
-
     fn previous_guesses(&self) -> Vec<Vec<(char, TileState)>>;
 }
 

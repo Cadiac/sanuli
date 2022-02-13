@@ -475,7 +475,7 @@ impl Manager {
         self.previous_game = previous_game;
 
         // Restore a suspended game or create a new one
-        let mut game =
+        let game =
             self.background_games
                 .remove(&next_game)
                 .unwrap_or_else(|| match next_game.0 {
@@ -497,8 +497,6 @@ impl Manager {
                     )),
                 });
 
-        // Prepare the previous game slide out animation
-        game.prepare_previous_guesses_animation(previous_game.2);
 
         self.game = Some(game);
         self.background_games.insert(previous_game, previous);
