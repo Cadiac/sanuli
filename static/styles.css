@@ -217,11 +217,18 @@ header {
     box-sizing: border-box;
 }
 
-.board-9 .tile {
+.board-9 .row-5 .tile {
     font-size: 1rem;
     line-height: 1rem;
     height: 2rem;
     width: 2rem;
+}
+
+.board-9 .row-6 .tile {
+    font-size: 0.8rem;
+    line-height: 0.8rem;
+    height: 1.6rem;
+    width: 1.6rem;
 }
 
 .keyboard {
