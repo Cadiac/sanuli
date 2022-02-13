@@ -194,7 +194,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     </button>
                     <button class={classes!("select", if props.game_mode == GameMode::Quadruple { "select-active" } else { "new-feature" })}
                         onmousedown={change_game_mode_quadruple}>
-                        {"UUSI: Neljä sanulia"}
+                        {"Neluli — Uusi!"}
                     </button>
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>

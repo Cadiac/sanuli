@@ -160,11 +160,10 @@ pub enum CharacterCount {
 
 #[derive(PartialEq, Serialize, Deserialize)]
 pub struct Manager {
-    pub allow_profanities: bool,
     pub current_game_mode: GameMode,
     pub current_word_list: WordList,
     pub current_word_length: usize,
-    pub current_max_guesses: usize,
+    pub allow_profanities: bool,
 
     pub previous_game: (GameMode, WordList, usize),
 
@@ -185,11 +184,10 @@ pub struct Manager {
 impl Default for Manager {
     fn default() -> Self {
         Self {
-            allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             current_game_mode: GameMode::default(),
             current_word_list: WordList::default(),
             current_word_length: DEFAULT_WORD_LENGTH,
-            current_max_guesses: DEFAULT_MAX_GUESSES,
+            allow_profanities: DEFAULT_ALLOW_PROFANITIES,
 
             previous_game: (
                 GameMode::default(),
