@@ -84,6 +84,12 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {"Päivän sanulit tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla aina sama kaikille pelaajille tiettynä päivänä."}
             </p>
             <p>
+                {"Sanuliketjussa jos arvaat sanulin, on se suoraan ensimmäinen arvaus seuraavaan peliin. Näin joudut sopeutumaan vaihtuviin alkuarvauksiin, ja peli on hieman vaikeampi."}
+            </p>
+            <p>
+                {"Nelulissa ratkaiset samalla kertaa neljää eri sanulia samoilla arvauksilla. Tavoite on saada kaikki neljä sanulia ratkaistua yhdeksällä arvauksella."}
+            </p>
+            <p>
                 {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {"."}
