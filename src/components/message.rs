@@ -105,6 +105,10 @@ fn sub_message(props: &SubMessageProps) -> Html {
         callback.emit(GameMsg::ShareLink);
     });
 
+    if props.game_mode == GameMode::Quadruple {
+        return html!{}   
+    }
+
     html! {
         <>
             <a class="link" href={format!("{}{}?searchMode=all", DICTIONARY_LINK_TEMPLATE, word)}
