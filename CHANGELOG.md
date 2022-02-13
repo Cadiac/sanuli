@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.13 - 2022-02-13
+### Added
+- New game mode: Neluli! Inspired by https://www.quordle.com/, solve four words simultaneously
+
+### Fixed
+- Fix max streaks not being persisted if the user never changed their settings before refreshin the page. This had been causing the bug that some users were reporting of their max streak being repoted wrong on the modal - unfortunately some data streaks may already be lost.
+
+### Changed
+- Different game modes with special rules can now be supported, as long as they implement the `Game` trait.
+
+
 ## v1.12 - 2022-02-03
 ### Added
 - Game can now be shared as a link, and the party receiving the link can either just view the solution or try it by themselves.
