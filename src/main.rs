@@ -225,10 +225,7 @@ impl Component for App {
                 .map(|key| (*key, game.keyboard_tilestate(key)))
                 .collect::<HashMap<char, KeyState>>();
 
-            // let last_guess = game.guesses()[game.current_guess()]
-            //     .iter()
-            //     .map(|(c, _)| c)
-            //     .collect::<String>();
+            let last_guess = game.last_guess();
 
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
@@ -297,8 +294,7 @@ impl Component for App {
                         game_mode={game.game_mode().clone()}
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}
-                        // last_guess={last_guess}
-                        last_guess={String::new()}
+                        last_guess={last_guess}
                         keyboard={keyboard_state}
                     />
 

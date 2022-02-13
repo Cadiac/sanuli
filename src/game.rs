@@ -37,6 +37,7 @@ pub trait Game {
     fn max_guesses(&self) -> usize;
     fn word(&self) -> Vec<char>;
 
+    fn last_guess(&self) -> String;
     fn boards(&self) -> Vec<Board>;
     fn streak(&self) -> usize;
 

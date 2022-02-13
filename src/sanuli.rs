@@ -365,6 +365,12 @@ impl Game for Sanuli {
         self.word.clone()
     }
 
+    fn last_guess(&self) -> String {
+        match self.guesses.get(self.current_guess) {
+            Some(guess) => guess.iter().map(|(c, _)| c).collect::<String>(),
+            None => String::new(),
+        }
+    }
     fn streak(&self) -> usize {
         self.streak
     }

@@ -140,6 +140,9 @@ impl Game for Neluli {
     fn streak(&self) -> usize {
         self.streak
     }
+    fn last_guess(&self) -> String {
+        String::new()
+    }
 
     fn is_guessing(&self) -> bool {
         self.boards.iter().any(|board| board.is_guessing())
