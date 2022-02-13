@@ -6,7 +6,7 @@ use gloo_storage::errors::StorageError;
 use serde::{Deserialize, Serialize};
 
 use crate::game::{Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS};
-use crate::manager::{GameMode, Theme, TileState, WordList, WordLists};
+use crate::manager::{GameMode, KeyState, Theme, TileState, WordList, WordLists};
 use crate::sanuli::Sanuli;
 
 const MAX_GUESSES: usize = 9;
@@ -45,7 +45,7 @@ impl Neluli {
     ) -> Self {
         let boards = vec![
             Sanuli::new(
-                GameMode::Quad,
+                GameMode::Quadruple,
                 word_list,
                 word_length,
                 MAX_GUESSES,
@@ -53,7 +53,7 @@ impl Neluli {
                 word_lists.clone(),
             ),
             Sanuli::new(
-                GameMode::Quad,
+                GameMode::Quadruple,
                 word_list,
                 word_length,
                 MAX_GUESSES,
@@ -61,7 +61,7 @@ impl Neluli {
                 word_lists.clone(),
             ),
             Sanuli::new(
-                GameMode::Quad,
+                GameMode::Quadruple,
                 word_list,
                 word_length,
                 MAX_GUESSES,
@@ -69,7 +69,7 @@ impl Neluli {
                 word_lists.clone(),
             ),
             Sanuli::new(
-                GameMode::Quad,
+                GameMode::Quadruple,
                 word_list,
                 word_length,
                 MAX_GUESSES,
@@ -119,7 +119,7 @@ impl Neluli {
 
 impl Game for Neluli {
     fn game_mode(&self) -> &GameMode {
-        &GameMode::Quad
+        &GameMode::Quadruple
     }
     fn word_list(&self) -> &WordList {
         &self.word_list
@@ -180,8 +180,13 @@ impl Game for Neluli {
 
     fn prepare_previous_guesses_animation(&mut self, _previous_length: usize) {}
 
-    fn keyboard_tilestate(&self, _key: &char) -> TileState {
-        TileState::Unknown
+    fn keyboard_tilestate(&self, key: &char) -> KeyState {
+        KeyState::Quadruple([
+            if let KeyState::Single(state) = self.boards[0].keyboard_tilestate(key) { state } else { TileState::Unknown },
+            if let KeyState::Single(state) = self.boards[1].keyboard_tilestate(key) { state } else { TileState::Unknown },
+            if let KeyState::Single(state) = self.boards[2].keyboard_tilestate(key) { state } else { TileState::Unknown },
+            if let KeyState::Single(state) = self.boards[3].keyboard_tilestate(key) { state } else { TileState::Unknown },
+        ])
     }
 
     fn submit_guess(&mut self) {

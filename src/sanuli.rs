@@ -17,7 +17,7 @@ use crate::game::{
 };
 use crate::logic;
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, WordLists, KeyState,
 };
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
@@ -505,13 +505,13 @@ impl Game for Sanuli {
         self.is_reset = true;
     }
 
-    fn keyboard_tilestate(&self, key: &char) -> TileState {
-        logic::keyboard_tile_state(
+    fn keyboard_tilestate(&self, key: &char) -> KeyState {
+        KeyState::Single(logic::keyboard_tile_state(
             key,
             self.current_guess,
             &self.known_states,
             &self.known_counts,
-        )
+        ))
     }
 
     fn submit_guess(&mut self) {
@@ -715,8 +715,8 @@ impl Game for Sanuli {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        if matches!(self.game_mode, GameMode::Shared | GameMode::Quad) {
-            // Never persist shared or quad games
+        if matches!(self.game_mode, GameMode::Shared | GameMode::Quadruple) {
+            // Never persist shared or quadruple games
             return Ok(());
         }
 

@@ -18,7 +18,7 @@ use components::{
     keyboard::Keyboard,
     modal::{HelpModal, MenuModal},
 };
-use manager::{GameMode, Manager, Theme, TileState, WordList};
+use manager::{GameMode, Manager, Theme, WordList, KeyState};
 
 // Use `wee_alloc` as the global allocator.
 #[global_allocator]
@@ -223,7 +223,7 @@ impl Component for App {
             let keyboard_state = ALLOWED_KEYS
                 .iter()
                 .map(|key| (*key, game.keyboard_tilestate(key)))
-                .collect::<HashMap<char, TileState>>();
+                .collect::<HashMap<char, KeyState>>();
 
             // let last_guess = game.guesses()[game.current_guess()]
             //     .iter()
@@ -239,10 +239,10 @@ impl Component for App {
                     />
 
                     {
-                        if self.manager.current_game_mode == GameMode::Quad {
+                        if self.manager.current_game_mode == GameMode::Quadruple {
                             html! {
-                                <div class="quad-container">
-                                    <div class="quad-grid">
+                                <div class="quadruple-container">
+                                    <div class="quadruple-grid">
                                         {game.boards().iter().map(|board| {
                                             html! {
                                                 <Board

@@ -118,7 +118,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
     let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
     let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
-    let change_game_mode_quad = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quad));
+    let change_game_mode_quadruple = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
 
     let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
@@ -192,8 +192,8 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", (props.game_mode == GameMode::Quad).then(|| Some("select-active")))}
-                        onmousedown={change_game_mode_quad}>
+                    <button class={classes!("select", (props.game_mode == GameMode::Quadruple).then(|| Some("select-active")))}
+                        onmousedown={change_game_mode_quadruple}>
                         {"Neluli"}
                     </button>
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}

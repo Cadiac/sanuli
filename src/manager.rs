@@ -26,6 +26,12 @@ pub const DAILY_WORD_LEN: usize = 5;
 
 pub type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum KeyState {
+    Quadruple([TileState; 4]),
+    Single(TileState),
+}
+
 fn parse_all_words() -> Rc<WordLists> {
     let mut word_lists: HashMap<(WordList, usize), HashSet<Vec<char>>> = HashMap::with_capacity(3);
     for word in FULL_WORDS.lines() {
@@ -78,7 +84,7 @@ pub enum GameMode {
     Relay,
     DailyWord(NaiveDate),
     Shared,
-    Quad,
+    Quadruple,
 }
 
 impl Default for GameMode {
@@ -106,7 +112,7 @@ pub enum CharacterState {
     Unknown,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum TileState {
     Correct,
     Absent,
@@ -473,7 +479,7 @@ impl Manager {
                         self.allow_profanities,
                         self.word_lists.clone(),
                     )),
-                    GameMode::Quad => Box::new(Neluli::new(
+                    GameMode::Quadruple => Box::new(Neluli::new(
                         next_game.1,
                         next_game.2,
                         self.allow_profanities,
@@ -525,8 +531,8 @@ impl Manager {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        if matches!(self.current_game_mode, GameMode::Shared | GameMode::Quad) {
-            // Never persist shared or quad games
+        if matches!(self.current_game_mode, GameMode::Shared | GameMode::Quadruple) {
+            // Never persist shared or quadruple games
             return Ok(());
         }
 

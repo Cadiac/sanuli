@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use yew::prelude::*;
 
-use crate::manager::{TileState, GameMode};
+use crate::manager::{GameMode, KeyState, TileState};
 use crate::Msg;
 
-use crate::components::{message::Message};
+use crate::components::message::Message;
 
 const KEYBOARD_0: [char; 10] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 const KEYBOARD_1: [char; 11] = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'];
@@ -28,7 +28,7 @@ pub struct Props {
     pub word: String,
     pub last_guess: String,
 
-    pub keyboard: HashMap<char, TileState>,
+    pub keyboard: HashMap<char, KeyState>,
 }
 
 #[function_component(Keyboard)]
@@ -52,10 +52,8 @@ pub fn keyboard(props: &Props) -> Html {
                             is_winner={props.is_winner}
                             is_guessing={props.is_guessing}
                             is_hidden={props.is_hidden}
-            
                             is_emojis_copied={props.is_emojis_copied}
                             is_link_copied={props.is_link_copied}
-            
                             last_guess={props.last_guess.clone()}
                             word={props.word.clone()}
                             game_mode={props.game_mode}
@@ -74,17 +72,10 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
-                        let tile_state = if !props.is_hidden {
-                            props.keyboard.get(key).unwrap().to_string()
-                        } else {
-                            TileState::Unknown.to_string()
-                        };
+                        let key_state = props.keyboard.get(key).unwrap_or(&KeyState::Single(TileState::Unknown));
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
-                                onmousedown={onkeypress}>
-                                { key }
-                            </button>
+                            <KeyboardButton character={*key} is_hidden={props.is_hidden} onkeypress={onkeypress} key_state={*key_state}/>
                         }
                     }).collect::<Html>()
                 }
@@ -102,17 +93,10 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
-                        let tile_state = if !props.is_hidden {
-                            props.keyboard.get(key).unwrap().to_string()
-                        } else {
-                            TileState::Unknown.to_string()
-                        };
+                        let key_state = props.keyboard.get(key).unwrap_or(&KeyState::Single(TileState::Unknown));
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
-                                onmousedown={onkeypress}>
-                                { key }
-                            </button>
+                            <KeyboardButton character={*key} is_hidden={props.is_hidden} onkeypress={onkeypress} key_state={*key_state}/>
                         }
                     }).collect::<Html>()
                 }
@@ -129,15 +113,10 @@ pub fn keyboard(props: &Props) -> Html {
                             callback.emit(Msg::KeyPress(*key));
                         });
 
-                        let tile_state = if !props.is_hidden {
-                            props.keyboard.get(key).unwrap().to_string()
-                        } else {
-                            TileState::Unknown.to_string()
-                        };
+                        let key_state = props.keyboard.get(key).unwrap_or(&KeyState::Single(TileState::Unknown));
 
                         html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", tile_state)}
-                                onmousedown={onkeypress}>{ key }</button>
+                            <KeyboardButton character={*key} is_hidden={props.is_hidden} onkeypress={onkeypress} key_state={*key_state}/>
                         }
                     }).collect::<Html>()
                 }
@@ -187,5 +166,50 @@ pub fn keyboard(props: &Props) -> Html {
                 <div class="spacer" />
             </div>
         </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct KeyboardButtonProps {
+    pub onkeypress: Callback<MouseEvent>,
+    pub character: char,
+    pub is_hidden: bool,
+    pub key_state: KeyState,
+}
+
+#[function_component(KeyboardButton)]
+pub fn keyboard_button(props: &KeyboardButtonProps) -> Html {
+    if !props.is_hidden {
+        match props.key_state {
+            KeyState::Single(state) => {
+                html! {
+                    <button data-nosnippet="" class={classes!("keyboard-button", state.to_string())} onmousedown={props.onkeypress.clone()}>
+                        { props.character }
+                    </button>
+                }
+            }
+            KeyState::Quadruple(states) => {
+                let background = format!(
+                    "background: conic-gradient(var(--{top_right}) 0deg, var(--{top_right}) 90deg, var(--{bottom_right}) 90deg, var(--{bottom_right}) 180deg, var(--{bottom_left}) 180deg, var(--{bottom_left}) 270deg, var(--{top_left}) 270deg, var(--{top_left}) 360deg);",
+                    top_left=states[0],
+                    top_right=states[1],
+                    bottom_left=states[2],
+                    bottom_right=states[3],
+                );
+
+                html! {
+                    <button data-nosnippet="" class={"keyboard-button"} style={background.clone()}
+                        onmousedown={props.onkeypress.clone()}>
+                        { props.character }
+                    </button>
+                }
+            }
+        }
+    } else {
+        html! {
+            <button data-nosnippet="" class={classes!("keyboard-button", "unknown")}>
+                { props.character }
+            </button>
+        }
     }
 }

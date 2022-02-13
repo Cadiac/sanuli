@@ -6,7 +6,7 @@ pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList,
+    CharacterCount, CharacterState, GameMode, Theme, TileState, WordList, KeyState,
 };
 
 pub const SUCCESS_EMOJIS: [&str; 8] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏"];
@@ -17,7 +17,7 @@ pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 pub trait Game {
     fn title(&self) -> String;
     fn next_word(&mut self);
-    fn keyboard_tilestate(&self, key: &char) -> TileState;
+    fn keyboard_tilestate(&self, key: &char) -> KeyState;
     fn submit_guess(&mut self);
     fn push_character(&mut self, character: char);
     fn pop_character(&mut self);
