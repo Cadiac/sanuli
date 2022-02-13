@@ -92,7 +92,7 @@ impl Neluli {
     }
 
     fn is_game_ended(&self) -> bool {
-        self.boards.iter().all(|board| board.is_game_ended())
+        self.boards.iter().all(|board| !board.is_guessing())
     }
 
     fn clear_message(&mut self) {
@@ -112,7 +112,7 @@ impl Neluli {
                 .filter(|game| !game.is_winner())
                 .map(|game| game.word().iter().collect::<String>())
                 .collect();
-            self.message = format!("Löytämättä jäi: \"{}\"", words.join(", "));
+            self.message = format!("Löytämättä jäi: \"{}\"", words.join("\", \""));
         }
     }
 }
