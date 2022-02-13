@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
-use crate::game::{BaseGame, Game};
+use crate::game::Game;
+use crate::neluli::Neluli;
+use crate::sanuli::Sanuli;
 
 const FULL_WORDS: &str = include_str!("../full-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
@@ -217,7 +219,7 @@ impl Manager {
                 }
             }
 
-            let game = BaseGame::new_or_rehydrate(
+            let game = Sanuli::new_or_rehydrate(
                 manager.current_game_mode,
                 manager.current_word_list,
                 manager.current_word_length,
@@ -231,10 +233,11 @@ impl Manager {
             manager
         } else {
             // Otherwise either create everything from scratch or recover some data from legacy storage manager
-            let game = BaseGame::new(
+            let game = Sanuli::new(
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
+                DEFAULT_MAX_GUESSES,
                 DEFAULT_ALLOW_PROFANITIES,
                 word_lists.clone(),
             );
@@ -251,7 +254,7 @@ impl Manager {
             manager
         };
 
-        // IF this is a shared game switch to it immediately. Set the game we were going to display in the background
+        // If this is a shared game switch to it immediately. Set the game we were going to display in the background
         if let Some(game) = initial_manager.rehydrate_shared_game() {
             initial_manager.current_game_mode = game.game_mode;
             initial_manager.current_word_length = game.word_length;
@@ -268,7 +271,7 @@ impl Manager {
         initial_manager
     }
 
-    fn rehydrate_shared_game(&self) -> Option<BaseGame> {
+    fn rehydrate_shared_game(&self) -> Option<Sanuli> {
         let window: Window = window().expect("window not available");
         let qs = window.location().search().ok()?;
         if qs.is_empty() {
@@ -288,7 +291,7 @@ impl Manager {
 
                 let game_str = window.atob(&base64).ok()?;
 
-                let game = BaseGame::from_shared_link(&game_str, self.word_lists.clone());
+                let game = Sanuli::from_shared_link(&game_str, self.word_lists.clone());
 
                 // Remove the query string
                 window
@@ -323,7 +326,7 @@ impl Manager {
     }
 
     pub fn submit_guess(&mut self) {
-        if self.game.is_none() {
+        if self.game.is_none() || !self.game.as_ref().unwrap().is_guessing() {
             return;
         }
 
@@ -437,7 +440,7 @@ impl Manager {
 
         let previous = match mem::take(&mut self.game) {
             Some(game) => game,
-            None => Box::new(BaseGame::default()) as Box<dyn Game>,
+            None => Box::new(Sanuli::default()) as Box<dyn Game>,
         };
 
         let previous_game = (
@@ -456,15 +459,27 @@ impl Manager {
         self.previous_game = previous_game;
 
         // Restore a suspended game or create a new one
-        let mut game = self.background_games.remove(&next_game).unwrap_or_else(|| {
-            Box::new(BaseGame::new_or_rehydrate(
-                next_game.0,
-                next_game.1,
-                next_game.2,
-                self.allow_profanities,
-                self.word_lists.clone(),
-            ))
-        });
+        let mut game =
+            self.background_games
+                .remove(&next_game)
+                .unwrap_or_else(|| match next_game.0 {
+                    GameMode::Classic
+                    | GameMode::Relay
+                    | GameMode::DailyWord(_)
+                    | GameMode::Shared => Box::new(Sanuli::new_or_rehydrate(
+                        next_game.0,
+                        next_game.1,
+                        next_game.2,
+                        self.allow_profanities,
+                        self.word_lists.clone(),
+                    )),
+                    GameMode::Quad => Box::new(Neluli::new(
+                        next_game.1,
+                        next_game.2,
+                        self.allow_profanities,
+                        self.word_lists.clone(),
+                    )),
+                });
 
         // Prepare the previous game slide out animation
         game.prepare_previous_guesses_animation(previous_game.2);
@@ -510,8 +525,8 @@ impl Manager {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        if self.current_game_mode == GameMode::Shared {
-            // Never persist shared games
+        if matches!(self.current_game_mode, GameMode::Shared | GameMode::Quad) {
+            // Never persist shared or quad games
             return Ok(());
         }
 

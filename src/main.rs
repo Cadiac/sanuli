@@ -9,6 +9,8 @@ mod components;
 mod manager;
 mod game;
 mod logic;
+mod sanuli;
+mod neluli;
 
 use components::{
     board::Board,
@@ -237,25 +239,50 @@ impl Component for App {
                     />
 
                     {
-                        html! {
-                            <div class="board-container">
-                                {game.boards().iter().map(|board| {
-                                    html! {
-                                        <Board
-                                            guesses={board.guesses.clone()}
-                                            is_guessing={board.is_guessing}
-                                            current_guess={board.current_guess}
+                        if self.manager.current_game_mode == GameMode::Quad {
+                            html! {
+                                <div class="board-container">
+                                    <div class="quad-container">
+                                        {game.boards().iter().map(|board| {
+                                            html! {
+                                                <Board
+                                                    guesses={board.guesses.clone()}
+                                                    is_guessing={board.is_guessing}
+                                                    current_guess={board.current_guess}
 
-                                            is_reset={game.is_reset()}
-                                            is_hidden={game.is_hidden()}
-                                            previous_guesses={game.previous_guesses().clone()}
-                                            
-                                            max_guesses={game.max_guesses()}
-                                            word_length={game.word_length()}
-                                        />
-                                    }
-                                }).collect::<Html>()}
-                            </div>
+                                                    is_reset={game.is_reset()}
+                                                    is_hidden={game.is_hidden()}
+                                                    previous_guesses={game.previous_guesses().clone()}
+                                                    
+                                                    max_guesses={game.max_guesses()}
+                                                    word_length={game.word_length()}
+                                                />
+                                            }
+                                        }).collect::<Html>()}
+                                    </div>
+                                </div>
+                            }
+                        } else {
+                            html! {
+                                <div class="board-container">
+                                    {game.boards().iter().map(|board| {
+                                        html! {
+                                            <Board
+                                                guesses={board.guesses.clone()}
+                                                is_guessing={board.is_guessing}
+                                                current_guess={board.current_guess}
+    
+                                                is_reset={game.is_reset()}
+                                                is_hidden={game.is_hidden()}
+                                                previous_guesses={game.previous_guesses().clone()}
+                                                
+                                                max_guesses={game.max_guesses()}
+                                                word_length={game.word_length()}
+                                            />
+                                        }
+                                    }).collect::<Html>()}
+                                </div>
+                            }
                         }
                     }
 
@@ -269,8 +296,7 @@ impl Component for App {
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
                         message={game.message()}
-                        // word={game.word().iter().collect::<String>()}
-                        word={String::new()}
+                        word={game.word().iter().collect::<String>()}
                         // last_guess={last_guess}
                         last_guess={String::new()}
                         keyboard={keyboard_state}

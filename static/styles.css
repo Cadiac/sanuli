@@ -169,7 +169,7 @@ header {
     justify-content: center;
     align-items: center;
     flex-grow: 1;
-    overflow: hidden;
+    overflow-y: scroll;
 }
 
 .board-6 {
@@ -181,6 +181,30 @@ header {
     grid-gap: 5px;
     padding: 10px;
     box-sizing: border-box;
+}
+
+.quad-container {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    grid-gap: 10px;
+    display: grid;
+    justify-content: center;
+    align-items: center;
+}
+
+.board-9 {
+    display: grid;
+    grid-template-rows: repeat(9, 1fr);
+    width: 170px;
+    height: 310px;
+    grid-gap: 5px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+.board-9 .tile {
+    font-size: 1rem;
+    line-height: 1rem;
 }
 
 .keyboard {
