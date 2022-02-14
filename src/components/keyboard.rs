@@ -42,7 +42,7 @@ pub fn keyboard(props: &Props) -> Html {
     html! {
         <div class="keyboard">
             {
-                if props.message.is_empty() {
+                if props.message.is_empty() && !props.is_hidden {
                     html! {}
                 } else {
                     html! {
