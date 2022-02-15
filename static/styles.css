@@ -203,7 +203,7 @@ header {
     display: grid;
     justify-content: center;
     align-items: center;
-    padding-bottom: 3rem;
+    padding-bottom: 1rem;
 }
 
 .board-9 {
