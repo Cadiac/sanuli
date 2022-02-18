@@ -15,8 +15,9 @@ use crate::game::Game;
 use crate::neluli::Neluli;
 use crate::sanuli::Sanuli;
 
-const FULL_WORDS: &str = include_str!("../full-words.txt");
+const EASY_WORDS: &str = include_str!("../easy-words.txt");
 const COMMON_WORDS: &str = include_str!("../common-words.txt");
+const FULL_WORDS: &str = include_str!("../full-words.txt");
 const PROFANITIES: &str = include_str!("../profanities.txt");
 
 pub const DEFAULT_WORD_LENGTH: usize = 5;
@@ -43,9 +44,28 @@ fn parse_all_words() -> Rc<WordLists> {
             .insert(chars.collect());
     }
 
+    // TODO: Only 5-letter easy words exist for now on this list; fake them from common list
+    for word in EASY_WORDS.lines() {
+        let chars = word.chars();
+        let word_length = chars.clone().count();
+        word_lists
+            .entry((WordList::Easy, word_length))
+            .or_insert_with(HashSet::new)
+            .insert(chars.collect());
+    }
+
     for word in COMMON_WORDS.lines() {
         let chars = word.chars();
         let word_length = chars.clone().count();
+
+        if word_length == 6 {
+            // TODO: Fake 6-letter easy words from common words, get rid of this if the list is created
+            word_lists
+                .entry((WordList::Easy, 6))
+                .or_insert_with(HashSet::new)
+                .insert(chars.clone().collect());
+        }
+
         word_lists
             .entry((WordList::Common, word_length))
             .or_insert_with(HashSet::new)
@@ -68,6 +88,7 @@ fn parse_all_words() -> Rc<WordLists> {
 pub enum WordList {
     Full,
     Common,
+    Easy,
     Profanities,
     Daily,
 }
@@ -475,28 +496,26 @@ impl Manager {
         self.previous_game = previous_game;
 
         // Restore a suspended game or create a new one
-        let game =
-            self.background_games
-                .remove(&next_game)
-                .unwrap_or_else(|| match next_game.0 {
-                    GameMode::Classic
-                    | GameMode::Relay
-                    | GameMode::DailyWord(_)
-                    | GameMode::Shared => Box::new(Sanuli::new_or_rehydrate(
+        let game = self
+            .background_games
+            .remove(&next_game)
+            .unwrap_or_else(|| match next_game.0 {
+                GameMode::Classic | GameMode::Relay | GameMode::DailyWord(_) | GameMode::Shared => {
+                    Box::new(Sanuli::new_or_rehydrate(
                         next_game.0,
                         next_game.1,
                         next_game.2,
                         self.allow_profanities,
                         self.word_lists.clone(),
-                    )),
-                    GameMode::Quadruple => Box::new(Neluli::new_or_rehydrate(
-                        next_game.1,
-                        next_game.2,
-                        self.allow_profanities,
-                        self.word_lists.clone(),
-                    )),
-                });
-
+                    ))
+                }
+                GameMode::Quadruple => Box::new(Neluli::new_or_rehydrate(
+                    next_game.1,
+                    next_game.2,
+                    self.allow_profanities,
+                    self.word_lists.clone(),
+                )),
+            });
 
         self.game = Some(game);
         self.background_games.insert(previous_game, previous);

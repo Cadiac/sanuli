@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v1.14 - 2022-02-19
+
+### Changed
+- Renamed the word lists: "Suppea" -> "Tavallinen", "Laaja" -> "Vaikea"
+
+### Added
+- "Helppo" word list only containing common everyday words. This list is intended for younger audiences or people who otherwise prefer playing with easier words. Big thanks to the person who helped me compile this list!
+
 ## v1.13 - 2022-02-13
 ### Added
 - New game mode: Neluli! Inspired by https://www.quordle.com/, solve four words simultaneously

@@ -1,29 +1,27 @@
+use chrono::Local;
 use yew::prelude::*;
-use chrono::{Local};
 
-use crate::manager::{GameMode, WordList, Theme};
+use crate::manager::{GameMode, Theme, WordList};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
 const CHANGELOG_URL: &str = "https://github.com/Cadiac/sanuli/blob/master/CHANGELOG.md";
-const VERSION: &str = "v1.13";
+const VERSION: &str = "v1.14";
 
 macro_rules! onmousedown {
-    ( $cb:ident, $msg:expr ) => {
-        {
-            let $cb = $cb.clone();
-            Callback::from(move |e: MouseEvent| {
-                e.prevent_default();
-                $cb.emit($msg);
-            })
-        }
-    };
+    ( $cb:ident, $msg:expr ) => {{
+        let $cb = $cb.clone();
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            $cb.emit($msg);
+        })
+    }};
 }
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct HelpModalProps {
     pub theme: Theme,
-    pub callback: Callback<Msg>
+    pub callback: Callback<Msg>,
 }
 
 #[function_component(HelpModal)]
@@ -36,7 +34,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <span onmousedown={toggle_help} class="modal-close">{"✖"}</span>
             <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
             <p>{"Jokaisen yrityksen jälkeen arvatut kirjaimet vaihtavat väriään."}</p>
-    
+
             <div class="row-5 example">
                 <div class={classes!("tile", "correct")}>{"K"}</div>
                 <div class={classes!("tile", "absent")}>{"O"}</div>
@@ -44,7 +42,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 <div class={classes!("tile", "absent")}>{"R"}</div>
                 <div class={classes!("tile", "absent")}>{"A"}</div>
             </div>
-    
+
             <p>
                 {
                     html! {
@@ -70,18 +68,24 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {": kirjain on arvauksessa oikealla paikalla."}
             </p>
             <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
-    
+
             <p>
-                {"Arvattaviin sanoihin käytetyn sanulistan voi valita asetuksista. Sanulistojen pohjana olivat Kotimaisten kielten keskuksen (Kotus) julkaiseman "}
+                {"Arvattaviin sanoihin käytetyn sanulistan vaikeusasteen voi valita asetuksista. Sanulistojen pohjana oli
+                Kotimaisten kielten keskuksen (Kotus) julkaiseman "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoidun nykysuomen sanulistan sanat. Suppealla listalla on näistä mielivaltaisesti karsittu kaikki harvinaisemmat laina- ja murressanat
-                sekä muut erikoisuudet pois. Laajalla listalla ei tätä karsintaa ole tehty, ja listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia."}
+                {" lisensoidun nykysuomen sanulistan sanat."}
+            </p>
+
+            <p><b>{"Tavallinen"}</b>{" lista sisältää täydestä listasta poimitut yleisimmät sanat ilman harvinaisempia laina- ja murressanoja tai muita erikoisuuksia."}</p>
+            <p><b>{"Helpppo"}</b>{" lista on tavallisesta vielä hieman helpotettu versio, jossa jäljellä ovat vain yleiset arkikielen sanat ilman vanhahtavia sanoja,
+                puhekieltä tai rumia sanuleja. Näin lista sopii kaikenikäisille. \"Helppo\" kuusikirjaimisten sanulien lista on kuitenkin vielä kesken."}</p>
+            <p><b>{"Vaikea"}</b>{" lista on täysi lista pelin hyväksymiä sanoja. Tälle listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia,
+                puhekielisyyksiä, murresanoja sekä muita erikoisuuksia, eikä poistoja ole tehty kuin vain jos sanulit eivät selvästi ole oikeita sanoja."}</p>
+            <p>
+                {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin pelkkää kirjakieltä. Yhdyssanojakin on seassa."}
             </p>
             <p>
-                {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin kirjakieltä. Yhdyssanojakin on seassa."}
-            </p>
-            <p>
-                {"Päivän sanulit tulevat omalta listaltaan, joka on jotain laajan ja suppean väliltä. Sanulin pitäisi olla aina sama kaikille pelaajille tiettynä päivänä."}
+                {"Päivän sanulit tulevat omalta listaltaan, joka on jotain tavallisen ja vaikean listan väliltä. Sanulin on aina sama kaikille pelaajille tiettynä päivänä."}
             </p>
             <p>
                 {"Sanuliketjussa jos arvaat sanulin, on se suoraan ensimmäinen arvaus seuraavaan peliin. Näin joudut sopeutumaan vaihtuviin alkuarvauksiin, ja peli on hieman vaikeampi."}
@@ -92,7 +96,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p>
                 {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
-                {"."}
+                {". Kiitos kaikille ehdotuksia jättäneille ja sanulistojen kasaamisessa auttaneille henkilöille!"}
             </p>
         </div>
     }
@@ -123,11 +127,14 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
 
     let change_game_mode_classic = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Classic));
     let change_game_mode_relay = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Relay));
-    let change_game_mode_daily = onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
-    let change_game_mode_quadruple = onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
+    let change_game_mode_daily =
+        onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
+    let change_game_mode_quadruple =
+        onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
 
-    let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
+    let change_word_list_easy = onmousedown!(callback, Msg::ChangeWordList(WordList::Easy));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
+    let change_word_list_full = onmousedown!(callback, Msg::ChangeWordList(WordList::Full));
 
     let change_allow_profanities_yes = onmousedown!(callback, Msg::ChangeAllowProfanities(true));
     let change_allow_profanities_no = onmousedown!(callback, Msg::ChangeAllowProfanities(false));
@@ -159,13 +166,17 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         <div>
                             <label class="label">{"Sanulista:"}</label>
                             <div class="select-container">
+                                <button class={classes!("select", (props.current_word_list == WordList::Easy).then(|| Some("select-active")))}
+                                    onmousedown={change_word_list_easy}>
+                                    {"Helppo"}
+                                </button>
                                 <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
                                     onmousedown={change_word_list_common}>
-                                    {"Suppea"}
+                                    {"Tavallinen"}
                                 </button>
                                 <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
                                     onmousedown={change_word_list_full}>
-                                    {"Laaja"}
+                                    {"Vaikea"}
                                 </button>
                             </div>
                         </div>
