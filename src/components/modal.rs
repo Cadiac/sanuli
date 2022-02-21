@@ -77,7 +77,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             </p>
 
             <p><b>{"Tavallinen"}</b>{" lista sisältää täydestä listasta poimitut yleisimmät sanat ilman harvinaisempia laina- ja murressanoja tai muita erikoisuuksia."}</p>
-            <p><b>{"Helpppo"}</b>{" lista on tavallisesta vielä hieman helpotettu versio, jossa jäljellä ovat vain yleiset arkikielen sanat ilman vanhahtavia sanoja,
+            <p><b>{"Helppo"}</b>{" lista on tavallisesta vielä hieman helpotettu versio, jossa jäljellä ovat vain yleiset arkikielen sanat ilman vanhahtavia sanoja,
                 puhekieltä tai rumia sanuleja. Näin lista sopii kaikenikäisille. \"Helppo\" kuusikirjaimisten sanulien lista on kuitenkin vielä kesken."}</p>
             <p><b>{"Vaikea"}</b>{" lista on täysi lista pelin hyväksymiä sanoja. Tälle listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia,
                 puhekielisyyksiä, murresanoja sekä muita erikoisuuksia, eikä poistoja ole tehty kuin vain jos sanulit eivät selvästi ole oikeita sanoja."}</p>
