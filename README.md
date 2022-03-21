@@ -28,6 +28,7 @@ touch common-words.txt
 touch daily-words.txt
 touch full-words.txt
 touch profanities.txt
+touch easy-words.txt
 ```
 
 Start the UI in development mode
