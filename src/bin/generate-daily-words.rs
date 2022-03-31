@@ -1,4 +1,5 @@
 use std::fs;
+use std::collections::HashSet;
 use rand::prelude::SliceRandom;
 
 const WORDS: &str = include_str!("../../full-words.txt");
@@ -21,12 +22,12 @@ fn parse_words(words: &str, word_length: usize) -> Vec<String> {
 fn main() {
     let word_list = parse_words(WORDS, 5);
 
-    let mut output: Vec<String> = Vec::new();
-    for _ in 0..100 {
+    let mut output: HashSet<String> = HashSet::new();
+    while output.len() < 1000 {
         let word = get_random_word(&word_list);
-        output.push(word);
+        output.insert(word);
     }
 
-    let output_data = output.join("\n");
+    let output_data = output.into_iter().collect::<Vec<String>>().join("\n");
     fs::write("daily-words.txt", output_data).expect("Unable to write file");
 }

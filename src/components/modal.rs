@@ -209,9 +209,9 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", if props.game_mode == GameMode::Quadruple { "select-active" } else { "new-feature" })}
+                    <button class={classes!("select", (props.game_mode == GameMode::Quadruple).then(|| Some("select-active")))}
                         onmousedown={change_game_mode_quadruple}>
-                        {"Neluli — Uusi!"}
+                        {"Neluli"}
                     </button>
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
