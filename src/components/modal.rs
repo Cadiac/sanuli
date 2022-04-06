@@ -70,13 +70,13 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
 
             <p>
-                {"Arvattaviin sanoihin käytetyn sanulistan vaikeusasteen voi valita asetuksista. Sanulistojen pohjana oli
+                {"Arvattaviin sanoihin käytetyn sanulistan vaikeusasteen voi valita asetuksista. Sanulistojen pohjana on käytetty
                 Kotimaisten kielten keskuksen (Kotus) julkaiseman "}
                 <a class="link" href="https://creativecommons.org/licenses/by/3.0/deed.fi" target="_blank">{"\"CC Nimeä 3.0 Muokkaamaton\""}</a>
-                {" lisensoidun nykysuomen sanulistan sanat."}
+                {"-lisensoidun nykysuomen sanalistan sanoja."}
             </p>
 
-            <p><b>{"Tavallinen"}</b>{" lista sisältää täydestä listasta poimitut yleisimmät sanat ilman harvinaisempia laina- ja murressanoja tai muita erikoisuuksia."}</p>
+            <p><b>{"Tavallinen"}</b>{" lista sisältää täydestä listasta poimitut yleisimmät sanat ilman harvinaisempia laina- ja murresanoja tai muita erikoisuuksia."}</p>
             <p><b>{"Helppo"}</b>{" lista on tavallisesta vielä hieman helpotettu versio, jossa jäljellä ovat vain yleiset arkikielen sanat ilman vanhahtavia sanoja,
                 puhekieltä tai rumia sanuleja. Näin lista sopii kaikenikäisille. \"Helppo\" kuusikirjaimisten sanulien lista on kuitenkin vielä kesken."}</p>
             <p><b>{"Vaikea"}</b>{" lista on täysi lista pelin hyväksymiä sanoja. Tälle listalle on myös lisätty jonkin verran käyttäjien uusia ehdotuksia,
@@ -85,7 +85,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {"Sanulit ovat yleensä perusmuodossa, mutta eivät välttämättä täysin pelkkää kirjakieltä. Yhdyssanojakin on seassa."}
             </p>
             <p>
-                {"Päivän sanulit tulevat omalta listaltaan, joka on jotain tavallisen ja vaikean listan väliltä. Sanulin on aina sama kaikille pelaajille tiettynä päivänä."}
+                {"Päivän sanulit tulevat omalta listaltaan, joka on jotain tavallisen ja vaikean listan väliltä. Sanuli on aina sama kaikille pelaajille tiettynä päivänä."}
             </p>
             <p>
                 {"Sanuliketjussa jos arvaat sanulin, on se suoraan ensimmäinen arvaus seuraavaan peliin. Näin joudut sopeutumaan vaihtuviin alkuarvauksiin, ja peli on hieman vaikeampi."}
