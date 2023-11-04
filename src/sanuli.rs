@@ -250,7 +250,7 @@ impl Sanuli {
     }
 
     fn get_daily_word_index(date: NaiveDate) -> usize {
-        let epoch = NaiveDate::from_ymd(2022, 1, 7); // Epoch of the daily word mode, index 0
+        let epoch = NaiveDate::from_ymd_opt(2022, 1, 7).unwrap(); // Epoch of the daily word mode, index 0
         date.signed_duration_since(epoch).num_days() as usize
     }
 
@@ -530,7 +530,10 @@ impl Game for Sanuli {
         if self.is_game_ended() {
             self.is_guessing = false;
 
-            if matches!(self.game_mode, GameMode::DailyWord(_) | GameMode::Shared | GameMode::Quadruple) {
+            if matches!(
+                self.game_mode,
+                GameMode::DailyWord(_) | GameMode::Shared | GameMode::Quadruple
+            ) {
                 // Do nothing, don't update streaks
             } else if self.is_winner {
                 self.streak += 1;

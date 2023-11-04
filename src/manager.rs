@@ -236,7 +236,7 @@ impl Manager {
         // Attempt to rehydrate manager from localStorage
         let mut initial_manager = if let Ok(mut manager) = Manager::rehydrate() {
             if let GameMode::DailyWord(date) = manager.current_game_mode {
-                let today = Local::today().naive_local();
+                let today = Local::now().date_naive();
 
                 if date < today {
                     // Page was refreshed after the day changed - rehydrate the daily word of today
