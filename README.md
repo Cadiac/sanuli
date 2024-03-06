@@ -5,7 +5,7 @@
 
 ![Sanuli](/static/sanuli-1200x630.png)
 
-A finnish version of the word guessing game [Wordle](https://www.powerlanguage.co.uk/wordle/) implemented in [Rust](https://www.rust-lang.org).
+A finnish version of a popular word guessing game implemented in [Rust](https://www.rust-lang.org).
 
 Live version running at [sanuli.fi](https://sanuli.fi).
 
