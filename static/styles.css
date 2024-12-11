@@ -89,6 +89,7 @@ header {
     letter-spacing: 0.2rem;
     text-transform: uppercase;
     text-align: center;
+    cursor: pointer;
 }
 
 .title {
