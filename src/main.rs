@@ -179,9 +179,7 @@ impl Component for App {
                     if let Some(emojis) = self.manager.share_emojis() {
                         let window: Window = window().expect("window not available");
                         let navigator: Navigator = window.navigator();
-                        if let Some(clipboard) = navigator.clipboard() {
-                            let _promise = clipboard.write_text(emojis.as_str());
-                        }
+                        let _promise = navigator.clipboard().write_text(emojis.as_str());
                     }
                 }
                 self.is_emojis_copied = true;
@@ -195,9 +193,7 @@ impl Component for App {
                     if let Some(link) = self.manager.share_link() {
                         let window: Window = window().expect("window not available");
                         let navigator: Navigator = window.navigator();
-                        if let Some(clipboard) = navigator.clipboard() {
-                            let _promise = clipboard.write_text(link.as_str());
-                        }
+                        let _promise = navigator.clipboard().write_text(link.as_str());
                     }
                 }
                 self.is_link_copied = true;
