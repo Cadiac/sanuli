@@ -270,9 +270,11 @@ impl Manager {
             manager
         } else {
             // Otherwise either create everything from scratch or recover some data from legacy storage manager
+            // Default to daily word (päivän sanuli) instead of classic
+            let today = Local::now().date_naive();
             let game = Sanuli::new(
-                GameMode::Classic,
-                WordList::Common,
+                GameMode::DailyWord(today),
+                WordList::Daily,
                 DEFAULT_WORD_LENGTH,
                 DEFAULT_MAX_GUESSES,
                 DEFAULT_ALLOW_PROFANITIES,
@@ -280,6 +282,8 @@ impl Manager {
             );
 
             let manager = Self {
+                current_game_mode: GameMode::DailyWord(today),
+                current_word_list: WordList::Daily,
                 game: Some(Box::new(game)),
                 word_lists,
                 ..Self::default()
