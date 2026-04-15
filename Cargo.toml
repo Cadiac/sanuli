@@ -48,3 +48,6 @@ opt-level = 'z'
 # opt-level = 's'
 # link time optimization using using whole-program analysis
 lto = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(web_sys_unstable_apis)'] }

@@ -6,19 +6,22 @@ use std::rc::Rc;
 use chrono::NaiveDate;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
+
+#[cfg(web_sys_unstable_apis)]
 use web_sys::{window, Window};
 
 pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::game;
-use crate::game::{
-    Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH,
-    SUCCESS_EMOJIS,
-};
+use crate::game::{Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists,
+    DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
 };
+
+#[cfg(web_sys_unstable_apis)]
+use crate::manager::Theme;
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
 
@@ -78,16 +81,13 @@ impl Sanuli {
         allow_profanities: bool,
         word_lists: Rc<WordLists>,
     ) -> Self {
-        let guesses = std::iter::repeat(Vec::with_capacity(word_length))
-            .take(max_guesses)
+        let guesses = std::iter::repeat_n(Vec::with_capacity(word_length), max_guesses)
             .collect::<Vec<_>>();
 
-        let known_states = std::iter::repeat(HashMap::new())
-            .take(max_guesses)
+        let known_states = std::iter::repeat_n(HashMap::new(), max_guesses)
             .collect::<Vec<_>>();
 
-        let known_counts = std::iter::repeat(HashMap::new())
-            .take(max_guesses)
+        let known_counts = std::iter::repeat_n(HashMap::new(), max_guesses)
             .collect::<Vec<_>>();
 
         let word = if word_lists.is_empty() {
@@ -147,12 +147,10 @@ impl Sanuli {
 
         guesses.resize(max_guesses, Vec::with_capacity(word_length));
 
-        let known_states = std::iter::repeat(HashMap::new())
-            .take(max_guesses)
+        let known_states = std::iter::repeat_n(HashMap::new(), max_guesses)
             .collect::<Vec<_>>();
 
-        let known_counts = std::iter::repeat(HashMap::new())
-            .take(max_guesses)
+        let known_counts = std::iter::repeat_n(HashMap::new(), max_guesses)
             .collect::<Vec<_>>();
 
         let mut game = Self {
@@ -179,7 +177,7 @@ impl Sanuli {
 
         game.refresh();
 
-        return Some(game);
+        Some(game)
     }
 
     pub fn new_or_rehydrate(
@@ -446,19 +444,16 @@ impl Game for Sanuli {
 
         self.guesses = Vec::with_capacity(self.max_guesses);
 
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_states = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
-        self.known_counts = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_counts = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
 
         if previous_word.len() == self.word_length
             && self.is_winner
             && self.game_mode == GameMode::Relay
         {
-            let empty_guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses - 1)
+            let empty_guesses = std::iter::repeat_n(Vec::with_capacity(self.word_length), self.max_guesses - 1)
                 .collect::<Vec<_>>();
 
             self.guesses.push(
@@ -481,8 +476,7 @@ impl Game for Sanuli {
             );
             self.current_guess = 1;
         } else {
-            self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-                .take(self.max_guesses)
+            self.guesses = std::iter::repeat_n(Vec::with_capacity(self.word_length), self.max_guesses)
                 .collect::<Vec<_>>();
             self.current_guess = 0;
         }
@@ -576,6 +570,7 @@ impl Game for Sanuli {
         self.guesses[self.current_guess].pop();
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_emojis(&self, theme: Theme) -> Option<String> {
         let mut message = String::new();
 
@@ -618,6 +613,7 @@ impl Game for Sanuli {
         Some(message)
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
         let game_str = format!(
             "{}|{}",
@@ -638,7 +634,7 @@ impl Game for Sanuli {
             .replace("/", ".")
             .replace("=", "_");
 
-        return Some(format!("{}/?peli={}", base_url, safe_str));
+        Some(format!("{}/?peli={}", base_url, safe_str))
     }
 
     fn reveal_hidden_tiles(&mut self) {
@@ -647,8 +643,7 @@ impl Game for Sanuli {
     }
 
     fn reset(&mut self) {
-        self.guesses = std::iter::repeat(Vec::with_capacity(self.word_length))
-            .take(self.max_guesses)
+        self.guesses = std::iter::repeat_n(Vec::with_capacity(self.word_length), self.max_guesses)
             .collect::<Vec<_>>();
 
         self.current_guess = 0;
@@ -660,24 +655,20 @@ impl Game for Sanuli {
         self.is_hidden = false;
         self.message = "Peli nollattu, arvaa sanuli!".to_owned();
 
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_states = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
 
-        self.known_counts = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_counts = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
 
         self.previous_guesses = Vec::new();
     }
 
     fn refresh(&mut self) {
-        self.known_states = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_states = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
 
-        self.known_counts = std::iter::repeat(HashMap::new())
-            .take(self.max_guesses)
+        self.known_counts = std::iter::repeat_n(HashMap::new(), self.max_guesses)
             .collect::<Vec<_>>();
 
         // Rerun the game to refresh known_states and known_counts

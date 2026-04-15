@@ -5,9 +5,15 @@ use std::rc::Rc;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
-use crate::game::{Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS};
-use crate::manager::{GameMode, KeyState, Theme, TileState, WordList, WordLists};
+use crate::game::{Board, Game};
+use crate::manager::{
+    GameMode, KeyState, TileState, WordList, WordLists,
+    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
+};
 use crate::sanuli::Sanuli;
+
+#[cfg(web_sys_unstable_apis)]
+use crate::manager::Theme;
 
 const MAX_GUESSES: usize = 9;
 
@@ -315,10 +321,12 @@ impl Game for Neluli {
         }
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_emojis(&self, _theme: Theme) -> Option<String> {
         unimplemented!()
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
         unimplemented!()
     }

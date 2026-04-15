@@ -72,7 +72,7 @@ To set the flag manually with environment variables, run:
 export RUSTFLAGS=--cfg=web_sys_unstable_apis
 ```
 
-You can ignore this at manual development (as the clipboard API won't work without HTTPS anywaays)
+You can ignore this at manual development (as the clipboard API won't work without HTTPS anyways)
 or run your trunk commands with it set.
 
 For normal development, start the web server with

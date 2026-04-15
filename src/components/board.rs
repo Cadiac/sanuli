@@ -33,7 +33,7 @@ pub fn board(props: &Props) -> Html {
                 }
             }
             <div class={classes!(
-                props.is_reset.then(|| "slide-in"),
+                props.is_reset.then_some("slide-in"),
                 props.is_reset.then(|| format!("slide-in-{}", props.previous_guesses.len())),
                 format!("board-{}", props.max_guesses))}>{
                     props.guesses.iter().enumerate().map(|(row, guess)| {
@@ -51,7 +51,7 @@ pub fn board(props: &Props) -> Html {
                                             <div class={classes!(
                                                 "tile",
                                                 tile_state.to_string(),
-                                                is_current_row.then(|| Some("current"))
+                                                is_current_row.then_some(Some("current"))
                                             )}>
                                                 {
                                                     if props.is_hidden {
